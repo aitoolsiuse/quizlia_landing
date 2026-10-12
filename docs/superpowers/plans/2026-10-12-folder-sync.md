@@ -947,3 +947,13 @@ git commit -m "docs: folder-sync matrix rows and gap closure in rollout runbook
 
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
+
+---
+
+## Post-review fixes (2026-10-13, final whole-branch review)
+
+Applied after the cross-repo final review (fix commits on this branch and release/1.0.12):
+- Web: legacy folders normalized with `updatedAt` on load (Firestore rejects `undefined`); `ensure()` routes notes of tombstoned folders to Unsorted (no resurrection); runbook matrix + pull-cadence corrections.
+- iOS: note docs written under the profile doc id (`remoteDocId`) so the web's read path matches; last-synced-name map so dirty pushes only carry genuine local renames; dirty mark cleared only on successful registry write; backfill adopts a same-named live registry entry's fid (two-device dedupe); `updateDocumentsFolder` profile-scoped; profile deletion removes the registry doc; "From Web" excluded from the insert hook; account wipe clears folder-sync UserDefaults.
+
+Accepted fast-follows (not fixed): iOS adopt-branch no-op DB write churn per launch (bounded); web pull cadence still first-visit-per-device (pre-existing); deep-offline `getDocument` stall holds the pass counter until next launch.
