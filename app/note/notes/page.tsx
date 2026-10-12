@@ -382,7 +382,7 @@ function NotesExplorer() {
           <MoveFolderModal
             isOpen={!!moveTopicTarget}
             onClose={() => setMoveTopicTarget(null)}
-            folders={folders}
+            folders={folders.map((f) => ({ ...f, itemCount: countForFolder(f.id) }))}
             currentFolderId={moveTopicTarget?.folderId ? String(moveTopicTarget.folderId) : null}
             onMove={(folderId) => moveTopicTarget && handleMoveTopic(moveTopicTarget.id, folderId)}
           />
