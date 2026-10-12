@@ -111,36 +111,56 @@ export async function syncProfileFolders(
       const localMs = existing ? new Date(existing.updatedAt).getTime() || 0 : 0;
 
       if (!existing) {
-        // Pulled folder (or tombstone) this device has never seen.
         if (r.deletedAt) {
-          hooks?.onRemoteDelete?.(r.id);
-          continue; // tombstones for unknown folders are dropped, not stored
+          // Tombstone for a folder this device has never seen: remember it
+          // (kept locally and re-pushed) so a stale device cannot resurrect
+          // the folder; nothing to unsort for an unknown folder.
+          byId.set(r.id, {
+            id: r.id,
+            name: r.name || "deleted",
+            icon: r.icon || "📁",
+            createdAt: r.createdAt || new Date().toISOString(),
+            updatedAt: new Date(remoteMs || Date.now()).toISOString(),
+            deletedAt: new Date(asDate(r.deletedAt) || remoteMs || Date.now()).toISOString(),
+            clientOrigin: (r.clientOrigin as "web" | "ios") || "ios",
+          });
+        } else {
+          byId.set(r.id, {
+            id: r.id,
+            name: r.name,
+            icon: r.icon || "📁",
+            createdAt: r.createdAt || new Date().toISOString(),
+            updatedAt: new Date(remoteMs || Date.now()).toISOString(),
+            clientOrigin: (r.clientOrigin as "web" | "ios") || "ios",
+          });
         }
-        byId.set(r.id, {
-          id: r.id,
-          name: r.name,
-          icon: r.icon || "📁",
-          createdAt: r.createdAt || new Date().toISOString(),
-          updatedAt: new Date(remoteMs || Date.now()).toISOString(),
-          clientOrigin: (r.clientOrigin as "web" | "ios") || "ios",
-        });
         continue;
       }
 
       if (remoteMs > localMs) {
         if (r.deletedAt) {
+          // Remote delete wins: unsort this folder's notes and KEEP the
+          // tombstone locally (and in the push below) so every device
+          // converges on the delete.
           hooks?.onRemoteDelete?.(r.id);
-          byId.delete(r.id);
-          continue;
+          byId.set(r.id, {
+            ...existing,
+            deletedAt: new Date(asDate(r.deletedAt)).toISOString(),
+            updatedAt: new Date(remoteMs).toISOString(),
+          });
+        } else {
+          // Remote edit/undelete wins: the folder is alive.
+          byId.set(r.id, {
+            ...existing,
+            name: r.name,
+            icon: r.icon || existing.icon, // remote null never clobbers a local emoji
+            updatedAt: new Date(remoteMs).toISOString(),
+            deletedAt: null,
+          });
         }
-        byId.set(r.id, {
-          ...existing,
-          name: r.name,
-          icon: r.icon || existing.icon, // remote null never clobbers a local emoji
-          updatedAt: new Date(remoteMs).toISOString(),
-        });
       }
-      // else: local is newer or equal — local entry stays and is re-pushed below.
+      // else: local is newer or equal — local entry (possibly a tombstone)
+      // stays and is re-pushed below.
     }
 
     const merged = Array.from(byId.values());
@@ -306,7 +326,9 @@ interface Folder {
   };
 ```
 
-2i. Every UI consumer of `folders` switches to `visibleFolders` EXCEPT the tombstone-preserving state code: the root tile grid (`folders.map((f) => (<FolderTile …` → `visibleFolders.map`), the root subtitle count (`folders.length` → `visibleFolders.length`), the "no folders" hint (`folders.length === 0` → `visibleFolders.length === 0`), and the `MoveFolderModal` prop (`folders={folders.map((f) => ({ ...f, itemCount: countForFolder(f.id) }))}` → `visibleFolders.map((f) => ({ ...f, itemCount: countForFolder(f.id) }))`).
+2i. Every UI consumer of `folders` switches to `visibleFolders` EXCEPT the tombstone-preserving state code: the root tile grid (`folders.map((f) => (<FolderTile …` → `visibleFolders.map`), the root subtitle count (`folders.length` → `visibleFolders.length`), the "no folders" hint (`folders.length === 0` → `visibleFolders.length === 0`), the `MoveFolderModal` prop (`folders={folders.map((f) => ({ ...f, itemCount: countForFolder(f.id) }))}` → `visibleFolders.map((f) => ({ ...f, itemCount: countForFolder(f.id) }))`), and the `activeFolder` resolution (`folders.find((f) => f.id === folderParam)` → `visibleFolders.find((f) => f.id === folderParam)` — a tombstoned folder's URL renders the root view, same as an unknown id).
+
+(Import only `syncProfileFolders` in 2a — `localFoldersKey` is not used by the page.)
 
 - [ ] **Step 3: Verify**
 
