@@ -677,9 +677,15 @@ Insert this block immediately BEFORE the `// MARK: - Documents (up)` line:
                         ], merge: true) { _, _ in }
                     }
 
-                    var remaining = UserDefaults.standard.array(forKey: self.folderDirtyKey) as? [Int] ?? []
-                    remaining.removeAll { $0 == profileId }
-                    UserDefaults.standard.set(remaining, forKey: self.folderDirtyKey)
+                    // Clear only when this pass actually pushed the profile's
+                    // changes (snapshot-dirty). A mark that arrived mid-pass —
+                    // after the snapshot, before this clear — survives for the
+                    // completion re-check to drain.
+                    if dirty.contains(profileId) {
+                        var remaining = UserDefaults.standard.array(forKey: self.folderDirtyKey) as? [Int] ?? []
+                        remaining.removeAll { $0 == profileId }
+                        UserDefaults.standard.set(remaining, forKey: self.folderDirtyKey)
+                    }
 
                     self.pendingFolderPasses -= 1
 
@@ -799,6 +805,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes from Task 3: `QuizliSyncManager.shared.folderChangedLocally(profileId:)`, `isGeneralFolder` semantics (name check inlined here — DatabaseManager must not depend on SyncManager internals).
 - Produces: `updateDocumentsFolder(fromFolderId: Int, toFolderId: Int) -> Bool` (used by Task 3's tombstone application).
+- Threading contract: DatabaseManager's folder hooks call `QuizliSyncManager.shared.folderChangedLocally(profileId:)` on the main thread (FMDB work in this codebase is main-queue; the hook bodies are single no-wait calls).
 
 - [ ] **Step 1: Add the bulk repoint function**
 
