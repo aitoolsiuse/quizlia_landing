@@ -109,3 +109,26 @@ export function migrateContentToTopics(content: any[]): Topic[] {
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 }
+
+// Profile stored in localStorage "currentProfile" and rendered by the app UI
+export interface Profile {
+  id: number;
+  name: string;
+  type: string;
+  avatar: string;
+  email?: string;
+}
+
+// Legacy content item stored per profile (content_<profileId>)
+export interface ContentItem {
+  id: number;
+  title: string;
+  description: string;
+  type: string;
+  createdAt: string;
+  data?: any;
+  sourceId?: string;
+  sourceName?: string;
+  sourceType?: string;
+  folderId?: string;
+}
