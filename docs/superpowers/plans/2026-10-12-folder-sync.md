@@ -429,7 +429,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: registry doc contract from Task 1 (`folders` array on `folderRegistry`; entry `{id, name, icon, clientOrigin, createdAt, updatedAt, deletedAt}`), and web `userContent` items that carry `folderId` == cloud fid.
-- Produces (Task 4 consumes): `func syncAllFolders()` (public — DatabaseManager hooks call it), `private func isGeneralFolder(_ name: String) -> Bool`, and note docs gaining `"fid"`.
+- Produces (Task 4 consumes): `func syncAllFolders()` (public — DatabaseManager hooks call it) and note docs gaining `"fid"`.
 
 CANNOT be compiled on Windows. Verification = transcription review against this plan + a later Mac build. Every addition below follows the file's existing idioms (UserDefaults maps, `guard let uid`, Firestore completion style, FMDB work on the main queue).
 
@@ -449,22 +449,27 @@ Insert this block immediately BEFORE the `// MARK: - Documents (up)` line:
     //
     // Folder definitions live in one consolidated doc per profile
     // (folders/folderRegistry — same pattern as the web's notes/userContent).
-    // Cloud ids: "ios_{sqliteId}" for this device's folders, the web's own
-    // string ids for web-created ones; a UserDefaults map tracks local↔cloud
-    // identity. Deletes are tombstones so an offline device can't resurrect
-    // a folder; a tombstone applied here repoints the folder's documents to
-    // the hidden General folder instead of cascade-deleting them (remote
-    // deletes never destroy notes). Pushes are dirty-driven: launches only
-    // backfill folders missing from the registry, so a web-side rename of an
-    // ios-origin folder is not clobbered by stale local names.
+    // Cloud ids: "ios_{sqliteId}" for this device's folders (unique DB-wide),
+    // the web's own string ids for web-created ones; a UserDefaults map
+    // keyed "profileId:localId" tracks local↔cloud identity so one profile's
+    // dirty pass can never tombstone another profile's folders. Deletes are
+    // tombstones so an offline device can't resurrect a folder; a tombstone
+    // applied here repoints the folder's documents to the hidden General
+    // folder instead of cascade-deleting them (remote deletes never destroy
+    // notes). Pushes are dirty-driven: launches only backfill folders
+    // missing from the registry, so a web-side rename of an ios-origin
+    // folder is not clobbered by stale local names. Entry timestamps are
+    // ISO strings — Firestore field transforms (serverTimestamp) cannot be
+    // nested inside array elements; only the doc-level updatedAt uses one.
 
     private let folderMapKey = "syncFolderDocIdMap"
     private let folderDirtyKey = "syncFoldersDirtyProfiles"
+    private let folderIso = ISO8601DateFormatter()
 
-    /// True while a sync pass is applying remote changes locally. Guards the
-    /// DatabaseManager hooks against re-entrancy (a pull-side insert must not
-    /// mark the profile dirty and trigger another pass).
-    private(set) var isSyncingFolders = false
+    /// Pending async registry passes. folderChangedLocally queues its dirty
+    /// mark and re-checks after each completion instead of dropping it; the
+    /// counter (not a Bool) survives overlapping per-profile completions.
+    private var pendingFolderPasses = 0
 
     private func folderDocIdMap() -> [String: String] {
         if let data = UserDefaults.standard.data(forKey: folderMapKey),
@@ -480,14 +485,16 @@ Insert this block immediately BEFORE the `// MARK: - Documents (up)` line:
         }
     }
 
-    private func remoteFolderId(forLocalId localId: Int) -> String {
-        return folderDocIdMap()["\(localId)"] ?? "ios_\(localId)"
+    private func remoteFolderId(forLocalId localId: Int, profileId: Int) -> String {
+        return folderDocIdMap()["\(profileId):\(localId)"] ?? "ios_\(localId)"
     }
 
     private func localFolderId(forRemoteFolder fid: String) -> Int? {
         let map = folderDocIdMap()
-        for (localId, remoteId) in map where remoteId == fid {
-            return Int(localId)
+        for (key, remoteId) in map where remoteId == fid {
+            if let localId = key.split(separator: ":").last.flatMap({ Int(String($0)) }) {
+                return localId
+            }
         }
         if fid.hasPrefix("ios_"), let own = Int(fid.dropFirst(4)) {
             return own
@@ -509,22 +516,23 @@ Insert this block immediately BEFORE the `// MARK: - Documents (up)` line:
         _ = DatabaseManager.shared.insertFolder(
             profileId: profileId,
             folderName: name,
-            createdAt: ISO8601DateFormatter().string(from: Date()),
+            createdAt: folderIso.string(from: Date()),
             folderImage: nil
         )
         return DatabaseManager.shared.fetchFolderId(profileId: profileId, folderName: name)
     }
 
     /// Called by DatabaseManager hooks after any local folder create/rename/
-    /// delete (General excluded there). Marks the profile dirty and kicks a
-    /// sync pass; safe to call from any thread (DB reads hop to main).
+    /// delete (General excluded there). Queues the dirty mark FIRST — a
+    /// change arriving mid-pass is picked up by the pass's completion
+    /// re-check rather than lost — then kicks a pass if none is running.
     func folderChangedLocally(profileId: Int) {
-        guard !isSyncingFolders else { return }
         var dirty = UserDefaults.standard.array(forKey: folderDirtyKey) as? [Int] ?? []
         if !dirty.contains(profileId) {
             dirty.append(profileId)
             UserDefaults.standard.set(dirty, forKey: folderDirtyKey)
         }
+        guard pendingFolderPasses == 0 else { return }
         syncAllFolders()
     }
 
@@ -533,11 +541,11 @@ Insert this block immediately BEFORE the `// MARK: - Documents (up)` line:
     /// tombstones (repoint documents to General, never delete them).
     func syncAllFolders() {
         guard let uid = uid else { return }
-        isSyncingFolders = true
         let dirty = Set(UserDefaults.standard.array(forKey: folderDirtyKey) as? [Int] ?? [])
 
         for profile in DatabaseManager.shared.fetchProfiles() {
             guard let profileId = profile["id"] as? Int else { continue }
+            pendingFolderPasses += 1
             let profileDoc = db.collection("users").document(uid)
                 .collection("profiles").document(remoteDocId(forLocalId: profileId))
             let registry = profileDoc.collection("folders").document("folderRegistry")
@@ -552,6 +560,7 @@ Insert this block immediately BEFORE the `// MARK: - Documents (up)` line:
                     var map = self.folderDocIdMap()
                     var merged = remote
                     var changed = false
+                    let now = self.folderIso.string(from: Date())
 
                     let localFolders = DatabaseManager.shared
                         .fetchFolders(forProfileId: profileId)
@@ -560,8 +569,8 @@ Insert this block immediately BEFORE the `// MARK: - Documents (up)` line:
                     // 1) Backfill: local folders missing from the registry
                     //    (first sync, or a folder created while offline).
                     for folder in localFolders {
-                        let fid = self.remoteFolderId(forLocalId: folder.id)
-                        map["\(folder.id)"] = fid
+                        let fid = self.remoteFolderId(forLocalId: folder.id, profileId: profileId)
+                        map["\(profileId):\(folder.id)"] = fid
                         if !merged.contains(where: { ($0["id"] as? String) == fid }) {
                             merged.append([
                                 "id": fid,
@@ -569,22 +578,26 @@ Insert this block immediately BEFORE the `// MARK: - Documents (up)` line:
                                 "icon": NSNull(),
                                 "clientOrigin": "ios",
                                 "createdAt": folder.createdAt,
-                                "updatedAt": FieldValue.serverTimestamp(),
+                                "updatedAt": now,
                                 "deletedAt": NSNull(),
                             ])
                             changed = true
                         }
                     }
 
-                    // 2) Dirty pushes: rewrites (rename) and tombstones.
+                    // 2) Dirty pushes — scoped to THIS profile's map entries
+                    //    ("pid:localId" keys) so another profile's folders
+                    //    are never tombstoned here. Renames ride the same
+                    //    pass as tombstones.
                     if dirty.contains(profileId) {
-                        let localIds = Set(localFolders.map { "\($0.id)" })
-                        // fids we remember but no longer have locally → tombstone
-                        for (localIdStr, fid) in map where !localIds.contains(localIdStr) {
+                        let localKeys = Set(localFolders.map { "\(profileId):\($0.id)" })
+                        for (key, fid) in map
+                        where key.hasPrefix("\(profileId):") && !localKeys.contains(key) {
+                            // fids we remember but no longer have locally → tombstone
                             if let idx = merged.firstIndex(where: { ($0["id"] as? String) == fid }) {
                                 var entry = merged[idx]
-                                entry["deletedAt"] = FieldValue.serverTimestamp()
-                                entry["updatedAt"] = FieldValue.serverTimestamp()
+                                entry["deletedAt"] = now
+                                entry["updatedAt"] = now
                                 merged[idx] = entry
                             } else {
                                 merged.append([
@@ -593,20 +606,19 @@ Insert this block immediately BEFORE the `// MARK: - Documents (up)` line:
                                     "icon": NSNull(),
                                     "clientOrigin": "ios",
                                     "createdAt": "",
-                                    "updatedAt": FieldValue.serverTimestamp(),
-                                    "deletedAt": FieldValue.serverTimestamp(),
+                                    "updatedAt": now,
+                                    "deletedAt": now,
                                 ])
                             }
                             changed = true
                         }
-                        // Renames: push current local names for live folders.
                         for folder in localFolders {
-                            let fid = self.remoteFolderId(forLocalId: folder.id)
+                            let fid = self.remoteFolderId(forLocalId: folder.id, profileId: profileId)
                             if let idx = merged.firstIndex(where: { ($0["id"] as? String) == fid }) {
                                 merged[idx]["name"] = folder.folderName
-                                merged[idx]["updatedAt"] = FieldValue.serverTimestamp()
+                                merged[idx]["updatedAt"] = now
+                                changed = true
                             }
-                            changed = true
                         }
                     }
 
@@ -625,7 +637,7 @@ Insert this block immediately BEFORE the `// MARK: - Documents (up)` line:
                                         fromFolderId: localId, toFolderId: generalId)
                                 }
                                 _ = DatabaseManager.shared.deleteFolder(folderId: localId, profileId: profileId)
-                                map.removeValue(forKey: "\(localId)")
+                                map.removeValue(forKey: "\(profileId):\(localId)")
                                 changed = true
                             } else if (entry["clientOrigin"] as? String) == "web",
                                       let name = entry["name"] as? String,
@@ -646,11 +658,11 @@ Insert this block immediately BEFORE the `// MARK: - Documents (up)` line:
                         _ = DatabaseManager.shared.insertFolder(
                             profileId: profileId,
                             folderName: name.firstLetterCapitalized,
-                            createdAt: (entry["createdAt"] as? String) ?? ISO8601DateFormatter().string(from: Date()),
+                            createdAt: (entry["createdAt"] as? String) ?? now,
                             folderImage: nil)
                         if let newId = DatabaseManager.shared.fetchFolderId(
                             profileId: profileId, folderName: name.firstLetterCapitalized) {
-                            map["\(newId)"] = fid
+                            map["\(profileId):\(newId)"] = fid
                         }
                         changed = true
                     }
@@ -668,7 +680,15 @@ Insert this block immediately BEFORE the `// MARK: - Documents (up)` line:
                     var remaining = UserDefaults.standard.array(forKey: self.folderDirtyKey) as? [Int] ?? []
                     remaining.removeAll { $0 == profileId }
                     UserDefaults.standard.set(remaining, forKey: self.folderDirtyKey)
-                    self.isSyncingFolders = false
+
+                    self.pendingFolderPasses -= 1
+
+                    // Changes that arrived mid-pass (hooks were guarded) or
+                    // another still-dirty profile → one more pass.
+                    if self.pendingFolderPasses == 0,
+                       !(UserDefaults.standard.array(forKey: self.folderDirtyKey) as? [Int] ?? []).isEmpty {
+                        self.syncAllFolders()
+                    }
                 }
             }
         }
@@ -684,7 +704,7 @@ In `syncAllDocumentsUp()`, pass the fid through (replace the inner call):
                     for document in DatabaseManager.shared.fetchDocuments(folderId: folder.id) {
                         let fid = isGeneralFolder(folder.folderName)
                             ? nil
-                            : remoteFolderId(forLocalId: folder.id)
+                            : remoteFolderId(forLocalId: folder.id, profileId: profileId)
                         upsertDocument(document, profileId: profileId, folderName: folder.folderName, fid: fid, uid: uid)
                     }
                 }
