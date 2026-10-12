@@ -7,7 +7,7 @@ import { Sidebar } from "@/components/app/Sidebar";
 import { useToast } from "@/components/app/ToastContainer";
 import { getAllStudyGuides, categoryColors, difficultyColors, StudyGuide } from "@/lib/studyGuide";
 import { persistProfileContent, loadProfileContent } from "@/lib/notesSync";
-import { syncProfileFolders, localFoldersKey } from "@/lib/folderSync";
+import { syncProfileFolders } from "@/lib/folderSync";
 import { CreateFolderModal } from "@/components/app/CreateFolderModal";
 import { RenameModal } from "@/components/app/RenameModal";
 import { MoveFolderModal } from "@/components/app/MoveFolderModal";
@@ -100,7 +100,7 @@ function NotesExplorer() {
   const isSpecialView = folderParam === "all" || folderParam === "none";
   const activeFolder = !folderParam || isSpecialView
     ? null
-    : folders.find((f) => f.id === folderParam) || null;
+    : visibleFolders.find((f) => f.id === folderParam) || null;
   const isRootView = !activeFolder && !isSpecialView;
 
   useEffect(() => {
