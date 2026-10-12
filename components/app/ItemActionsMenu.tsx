@@ -4,11 +4,13 @@ import { useState, useRef, useEffect } from "react";
 
 interface ItemActionsMenuProps {
   onRename: () => void;
-  onMove: () => void;
+  onMove?: () => void;
   showMove?: boolean;
+  onDelete?: () => void;
+  buttonClassName?: string;
 }
 
-export function ItemActionsMenu({ onRename, onMove, showMove = true }: ItemActionsMenuProps) {
+export function ItemActionsMenu({ onRename, onMove, showMove = true, onDelete, buttonClassName = "" }: ItemActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -34,7 +36,7 @@ export function ItemActionsMenu({ onRename, onMove, showMove = true }: ItemActio
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors"
+        className={`p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors ${buttonClassName}`}
         title="More actions"
       >
         <span className="material-symbols-outlined text-lg">more_vert</span>
@@ -53,7 +55,7 @@ export function ItemActionsMenu({ onRename, onMove, showMove = true }: ItemActio
             <span className="material-symbols-outlined text-lg text-orange-600">edit</span>
             Rename
           </button>
-          {showMove && (
+          {showMove && onMove && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -64,6 +66,19 @@ export function ItemActionsMenu({ onRename, onMove, showMove = true }: ItemActio
             >
               <span className="material-symbols-outlined text-lg text-purple-600">drive_file_move</span>
               Move to Folder
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+                setIsOpen(false);
+              }}
+              className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3"
+            >
+              <span className="material-symbols-outlined text-lg text-red-600">delete</span>
+              Delete
             </button>
           )}
         </div>
