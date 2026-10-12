@@ -399,7 +399,7 @@ Inside `mergeIOSNotesIntoContent`, directly after the `const d = noteDoc.data() 
       if (fname) {
         const byName = stored.find((f) => !f.deletedAt && f.name.toLowerCase() === fname.toLowerCase());
         if (byName) return byName.id;
-        return ensure(`ios_name_${fname.toLowerCase().replace(/\s+/g("_")}`, fname);
+        return ensure(`ios_name_${fname.toLowerCase().replace(/\s+/g, "_")}`, fname);
       }
       return undefined;
     };
