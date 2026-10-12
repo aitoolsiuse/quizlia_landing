@@ -7,6 +7,7 @@ export interface Topic {
   sourceUrl?: string;
   createdAt: string;
   folderId?: string | number;
+  renamedTitle?: string;
 
   // Embedded materials (all generated from same source)
   note?: NoteData;
@@ -131,4 +132,5 @@ export interface ContentItem {
   sourceName?: string;
   sourceType?: string;
   folderId?: string;
+  renamedTitle?: string;
 }
