@@ -82,6 +82,11 @@ service-account key.**
 - [ ] Firestore rules reject cross-UID reads (console simulator)
 - [ ] "Delete Account" removes the `users/{uid}` subtree and signs out
       (web data for that account is gone too)
+- [ ] Folder created on web appears on iOS (next launch) and vice versa
+- [ ] Rename on either side propagates (web: next My Notes visit · iOS: next launch)
+- [ ] Note created inside a folder lands in the same-named folder on the other platform
+- [ ] Delete on iOS → folder gone on web, its web notes Unsorted
+- [ ] Delete on web → folder gone on iOS, its iOS notes moved to General
 
 ## 6. Release
 
@@ -90,9 +95,10 @@ service-account key.**
 
 ## Known gaps — deliberately NOT in 1.0.12
 
-- **Folder organization does not sync**: iOS notes land in web "Unsorted" (the
-  web merge ignores `folderName`); web notes land in one iOS "From Web" folder.
-  Folder definitions are device-local on both sides. Next design round.
+- Folder organization syncs via the folderRegistry doc (spec:
+  `docs/superpowers/specs/2026-10-12-folder-sync-design.md`). Notes pulled
+  before this landed may still sit in web "Unsorted" / the iOS "From Web"
+  folder — one-time residue, not auto-repaired.
 - **Chat history sync** — optional Phase 3 per the spec, not built.
 
 Note: `docs/quailizy-firebase-setup.md` (iOS repo, branch `release/1.0.12`)
