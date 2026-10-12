@@ -370,7 +370,6 @@ Inside `mergeIOSNotesIntoContent`, directly after the `const d = noteDoc.data() 
     const resolveFolderId = (): string | undefined => {
       const fid = typeof d.fid === "string" && d.fid ? d.fid : null;
       const fname = typeof d.folderName === "string" ? d.folderName : "";
-      if (fname.toLowerCase().startsWith("general")) return undefined;
 
       const key = localFoldersKey(profile.id);
       let stored: SyncedFolder[] = [];
@@ -395,7 +394,11 @@ Inside `mergeIOSNotesIntoContent`, directly after the `const d = noteDoc.data() 
         return id;
       };
 
+      // fid is authoritative when present (a user folder legitimately named
+      // "General Physics" keeps its notes); the hidden General bucket's
+      // name rule applies only to legacy docs with no fid.
       if (fid) return ensure(fid, fname);
+      if (fname.toLowerCase().startsWith("general")) return undefined;
       if (fname) {
         const byName = stored.find((f) => !f.deletedAt && f.name.toLowerCase() === fname.toLowerCase());
         if (byName) return byName.id;
