@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/app/Sidebar";
 import { useToast } from "@/components/app/ToastContainer";
 import { getAllStudyGuides, categoryColors, difficultyColors, StudyGuide } from "@/lib/studyGuide";
 import { persistProfileContent, loadProfileContent } from "@/lib/notesSync";
+import { syncProfileFolders, localFoldersKey } from "@/lib/folderSync";
 import { CreateFolderModal } from "@/components/app/CreateFolderModal";
 import { RenameModal } from "@/components/app/RenameModal";
 import { MoveFolderModal } from "@/components/app/MoveFolderModal";
@@ -21,6 +22,9 @@ interface Folder {
   name: string;
   icon: string;
   createdAt: string;
+  updatedAt?: string;
+  deletedAt?: string | null;
+  clientOrigin?: "web" | "ios";
 }
 
 // Group stored content items into note-bearing topics (keeps folderId)
@@ -88,6 +92,9 @@ function NotesExplorer() {
   const [renameTopicTarget, setRenameTopicTarget] = useState<Topic | null>(null);
   const [moveTopicTarget, setMoveTopicTarget] = useState<Topic | null>(null);
 
+  // Tombstoned (remote-deleted) folders stay in state but are hidden by the UI.
+  const visibleFolders = folders.filter((f) => !f.deletedAt);
+
   // Folder view resolution from the URL (?folder=all|none|<id>)
   const folderParam = searchParams.get("folder");
   const isSpecialView = folderParam === "all" || folderParam === "none";
@@ -132,22 +139,64 @@ function NotesExplorer() {
     fetchStudyGuides();
   }, []);
 
+  // Folder registry sync (signed-in only; no-ops to the local list otherwise).
+  // Remote tombstones arrive here and unsort their notes via the hook.
+  useEffect(() => {
+    if (!profile) return;
+    let cancelled = false;
+    syncProfileFolders(profile, {
+      onRemoteDelete: (folderId) => {
+        if (!profile || typeof window === "undefined") return;
+        const storedContent = localStorage.getItem(`content_${profile.id}`);
+        if (storedContent) {
+          const content = JSON.parse(storedContent).map((item: ContentItem) =>
+            item.folderId === folderId ? { ...item, folderId: undefined } : item
+          );
+          persistProfileContent(profile, content);
+        }
+        setTopics((prev) =>
+          prev.map((t) => (t.folderId === folderId ? { ...t, folderId: undefined } : t))
+        );
+      },
+    }).then((merged) => {
+      if (!cancelled) setFolders(merged as Folder[]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [profile]);
+
   // Folders (parity with the iOS app's folder organization)
   const persistFolders = (next: Folder[]) => {
     setFolders(next);
     if (profile && typeof window !== "undefined") {
       localStorage.setItem(`folders_${profile.id}`, JSON.stringify(next));
+      syncProfileFolders(profile).catch(() => {});
     }
   };
 
   const handleCreateFolder = (name: string, icon: string) => {
-    persistFolders([...folders, { id: String(Date.now()), name, icon, createdAt: new Date().toISOString() }]);
+    persistFolders([
+      ...folders,
+      {
+        id: String(Date.now()),
+        name,
+        icon,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        clientOrigin: "web",
+      },
+    ]);
     showToast(`Folder "${name}" created`, "success");
   };
 
   const handleRenameFolder = (newName: string) => {
     if (!renameFolderTarget) return;
-    persistFolders(folders.map((f) => (f.id === renameFolderTarget.id ? { ...f, name: newName } : f)));
+    persistFolders(
+      folders.map((f) =>
+        f.id === renameFolderTarget.id ? { ...f, name: newName, updatedAt: new Date().toISOString() } : f
+      )
+    );
     setRenameFolderTarget(null);
   };
 
@@ -155,7 +204,12 @@ function NotesExplorer() {
     if (!profile || typeof window === "undefined") return;
     if (!window.confirm("Delete this folder? Its topics move back to Unsorted.")) return;
 
-    persistFolders(folders.filter((f) => f.id !== folderId));
+    // Tombstone (kept in the array, hidden by the UI) so the delete syncs.
+    persistFolders(
+      folders.map((f) =>
+        f.id === folderId ? { ...f, deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() } : f
+      )
+    );
     if (folderParam === folderId) router.replace("/note/notes");
 
     const storedContent = localStorage.getItem(`content_${profile.id}`);
@@ -253,7 +307,7 @@ function NotesExplorer() {
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Notes</h1>
                   <p className="text-gray-600 dark:text-gray-400 mt-2">
-                    {topics.length} topic{topics.length !== 1 ? "s" : ""} · {folders.length} folder{folders.length !== 1 ? "s" : ""}
+                    {topics.length} topic{topics.length !== 1 ? "s" : ""} · {visibleFolders.length} folder{visibleFolders.length !== 1 ? "s" : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -278,7 +332,7 @@ function NotesExplorer() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
                 <FolderTile href="/note/notes?folder=all" materialIcon="library_books" name="All Notes" count={topics.length} />
                 <FolderTile href="/note/notes?folder=none" materialIcon="inbox" name="Unsorted" count={unsortedCount} />
-                {folders.map((f) => (
+                {visibleFolders.map((f) => (
                   <FolderTile
                     key={f.id}
                     href={`/note/notes?folder=${f.id}`}
@@ -288,7 +342,7 @@ function NotesExplorer() {
                   />
                 ))}
               </div>
-              {folders.length === 0 && (
+              {visibleFolders.length === 0 && (
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-12">
                   Create a folder to organize your notes.
                 </p>
@@ -383,7 +437,7 @@ function NotesExplorer() {
           <MoveFolderModal
             isOpen={!!moveTopicTarget}
             onClose={() => setMoveTopicTarget(null)}
-            folders={folders.map((f) => ({ ...f, itemCount: countForFolder(f.id) }))}
+            folders={visibleFolders.map((f) => ({ ...f, itemCount: countForFolder(f.id) }))}
             currentFolderId={moveTopicTarget?.folderId ? String(moveTopicTarget.folderId) : null}
             onMove={(folderId) => moveTopicTarget && handleMoveTopic(moveTopicTarget.id, folderId)}
           />
