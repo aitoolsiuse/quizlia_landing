@@ -29,8 +29,8 @@ export function TopicCard({ topic, onDelete, onRename, onMove }: TopicCardProps)
 
   return (
     <div className="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm hover:shadow-lg transition-all hover:border-blue-500 dark:hover:border-blue-500 relative">
-      {/* Hover actions */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Actions: revealed on hover, keyboard focus, and always on touch-sized screens */}
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 max-lg:opacity-100 transition-opacity">
         <button
           onClick={(e) => {
             e.preventDefault();
