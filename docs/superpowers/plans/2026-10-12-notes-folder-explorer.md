@@ -930,8 +930,8 @@ export function TopicCard({ topic, onDelete, onRename, onMove }: TopicCardProps)
 
   return (
     <div className="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm hover:shadow-lg transition-all hover:border-blue-500 dark:hover:border-blue-500 relative">
-      {/* Hover actions */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Actions: revealed on hover, keyboard focus, and always on touch-sized screens */}
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 max-lg:opacity-100 transition-opacity">
         <button
           onClick={(e) => {
             e.preventDefault();
@@ -1288,6 +1288,7 @@ function NotesExplorer() {
 
   const handleDeleteTopic = (topicId: string) => {
     if (!profile || typeof window === "undefined") return;
+    if (!window.confirm("Delete this topic?")) return;
 
     const storedContent = localStorage.getItem(`content_${profile.id}`);
     if (storedContent) {
@@ -1684,7 +1685,7 @@ Verify each item, fixing defects as found:
 10. Visit `/note/notes?folder=999999` (nonexistent) → root renders.
 11. Dashboard `/note` still generates and lists topics exactly as before.
 12. Toggle dark mode (sidebar/settings as existing) → explorer renders correctly dark.
-13. Narrow viewport to ~375px → tiles wrap 2-per-row, toolbar stacks, no horizontal scroll.
+13. Narrow viewport to ~375px → tiles wrap 2-per-row, toolbar stacks, no horizontal scroll, and the topic-card action row (delete + ⋯) is visible without hovering; deleting a topic asks for confirmation.
 
 - [ ] **Step 3: Final build + commit any fixes**
 
