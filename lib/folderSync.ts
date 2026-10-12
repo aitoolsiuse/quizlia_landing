@@ -56,6 +56,13 @@ export async function syncProfileFolders(
     } catch {
       local = [];
     }
+    // Folders created before folder sync existed have no updatedAt; the
+    // Firestore push rejects undefined field values, so normalize to
+    // createdAt (fallback: now) before merging or pushing.
+    local = local.map((f) => ({
+      ...f,
+      updatedAt: f.updatedAt || f.createdAt || new Date().toISOString(),
+    }));
   }
 
   if (!isFirebaseConfigured() || !db || !auth?.currentUser) return local;

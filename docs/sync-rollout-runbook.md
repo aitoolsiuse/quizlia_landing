@@ -75,7 +75,8 @@ service-account key.**
 - [ ] Two iOS devices, same linked account: note created offline on one appears
       on the other after launch
 - [ ] Note created on web appears on iOS; note created on iOS appears on web
-      (web side needs one reload / folder visit to pull)
+      (web side pulls iOS notes on a device's first visit / when local
+      content is empty; broader pull cadence is a documented follow-up)
 - [ ] Anonymous iOS user creates note → "Enable Sync" (link email) → data
       persists under the upgraded UID; sign in with the same email on web → sees it
 - [ ] Promo code redemption works on both platforms (quailizy `promoCodes`)
@@ -87,6 +88,11 @@ service-account key.**
 - [ ] Note created inside a folder lands in the same-named folder on the other platform
 - [ ] Delete on iOS → folder gone on web, its web notes Unsorted
 - [ ] Delete on web → folder gone on iOS, its iOS notes moved to General
+- [ ] Existing user with pre-release folders opens My Notes signed in → the
+      folderRegistry doc appears in the Firestore console (legacy folders upload)
+- [ ] With a web-origin folder present: iOS registry writes settle within
+      ≤2 passes per launch (watch the Firestore console; continuous writes
+      indicate the rename-tracking or adopt loops regressed)
 
 ## 6. Release
 

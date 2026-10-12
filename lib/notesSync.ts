@@ -144,7 +144,11 @@ export async function mergeIOSNotesIntoContent(
           stored = [];
         }
 
-        const ensure = (id: string, name: string): string => {
+        const ensure = (id: string, name: string): string | undefined => {
+          // A tombstoned entry with this id means the folder was deleted
+          // (remotely or locally); the note belongs in Unsorted rather than a
+          // resurrected duplicate.
+          if (stored.find((f) => f.id === id && f.deletedAt)) return undefined;
           const hit = stored.find((f) => f.id === id && !f.deletedAt);
           if (hit) return id;
           stored.push({
