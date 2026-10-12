@@ -9,6 +9,7 @@
 import { db, auth, isFirebaseConfigured } from "./firebase";
 import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { currentUserDocId } from "./firebaseSubscription";
+import { localFoldersKey, SyncedFolder } from "./folderSync";
 
 export function localContentKey(profileId: number | string): string {
   return `content_${profileId}`;
@@ -128,6 +129,46 @@ export async function mergeIOSNotesIntoContent(
       if (known.has(noteDoc.id)) continue;
 
       const d = noteDoc.data() as Record<string, unknown>;
+      // Route the note into the same folder it lives in on iOS. fid is the
+      // cloud folder id (registry); legacy docs fall back to folderName; the
+      // hidden General bucket means Unsorted (no folderId).
+      const resolveFolderId = (): string | undefined => {
+        const fid = typeof d.fid === "string" && d.fid ? d.fid : null;
+        const fname = typeof d.folderName === "string" ? d.folderName : "";
+        if (fname.toLowerCase().startsWith("general")) return undefined;
+
+        const key = localFoldersKey(profile.id);
+        let stored: SyncedFolder[] = [];
+        try {
+          stored = JSON.parse(localStorage.getItem(key) || "[]");
+        } catch {
+          stored = [];
+        }
+
+        const ensure = (id: string, name: string): string => {
+          const hit = stored.find((f) => f.id === id && !f.deletedAt);
+          if (hit) return id;
+          stored.push({
+            id,
+            name: name || "Imported",
+            icon: "📁",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            clientOrigin: "ios",
+          });
+          localStorage.setItem(key, JSON.stringify(stored));
+          return id;
+        };
+
+        if (fid) return ensure(fid, fname);
+        if (fname) {
+          const byName = stored.find((f) => !f.deletedAt && f.name.toLowerCase() === fname.toLowerCase());
+          if (byName) return byName.id;
+          return ensure(`ios_name_${fname.toLowerCase().replace(/\s+/g, "_")}`, fname);
+        }
+        return undefined;
+      };
+      const folderId = resolveFolderId();
       const note = tryParse(d.note);
       const flashcards = tryParse(d.flashcard);
       const quiz = tryParse(d.quiz);
@@ -137,6 +178,7 @@ export async function mergeIOSNotesIntoContent(
         sourceType: mapType(d.contentType),
         title: d.title,
         createdAt: d.createdAt || new Date().toISOString(),
+        folderId,
       };
 
       let hasAny = false;
