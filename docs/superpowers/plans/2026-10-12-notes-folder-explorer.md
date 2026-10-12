@@ -61,6 +61,7 @@ export interface ContentItem {
   sourceName?: string;
   sourceType?: string;
   folderId?: string;
+  renamedTitle?: string;
 }
 ```
 
@@ -1116,7 +1117,8 @@ function buildTopics(content: ContentItem[]): Topic[] {
     if (!topicMap.has(sourceId)) {
       topicMap.set(sourceId, {
         id: sourceId,
-        title: item.sourceName || item.title || "Unknown",
+        title: item.renamedTitle || item.sourceName || item.title || "Unknown",
+        renamedTitle: item.renamedTitle,
         sourceType: (item.sourceType as Topic["sourceType"]) || "url",
         sourceUrl: item.sourceType === "youtube" || item.sourceType === "url" ? item.sourceName : undefined,
         createdAt: item.createdAt,
@@ -1127,7 +1129,7 @@ function buildTopics(content: ContentItem[]): Topic[] {
     const topic = topicMap.get(sourceId)!;
     if (item.type === "notes" && item.data) {
       topic.note = item.data;
-      if (item.data.title && item.data.title.length > 10) {
+      if (!topic.renamedTitle && item.data.title && item.data.title.length > 10) {
         topic.title = item.data.title;
       }
     } else if (item.type === "flashcards" && item.data?.flashcards) {
@@ -1274,13 +1276,13 @@ function NotesExplorer() {
     if (storedContent) {
       const content = JSON.parse(storedContent).map((item: ContentItem) =>
         item.sourceId === renameTopicTarget.id || `legacy_${item.id}` === renameTopicTarget.id
-          ? { ...item, title: newName }
+          ? { ...item, title: newName, renamedTitle: newName }
           : item
       );
       persistProfileContent(profile, content);
     }
     setTopics((prev) =>
-      prev.map((t) => (t.id === renameTopicTarget.id ? { ...t, title: newName } : t))
+      prev.map((t) => (t.id === renameTopicTarget.id ? { ...t, title: newName, renamedTitle: newName } : t))
     );
     setRenameTopicTarget(null);
     showToast("Topic renamed", "success");
@@ -1293,10 +1295,10 @@ function NotesExplorer() {
     const storedContent = localStorage.getItem(`content_${profile.id}`);
     if (storedContent) {
       const content = JSON.parse(storedContent);
-      const updatedContent = content.filter((item: ContentItem) => item.sourceId !== topicId);
+      const updatedContent = content.filter((item: ContentItem) => item.sourceId !== topicId && `legacy_${item.id}` !== topicId);
       persistProfileContent(profile, updatedContent);
 
-      setTopics(topics.filter((t) => t.id !== topicId));
+      setTopics((prev) => prev.filter((t) => t.id !== topicId));
     }
     showToast("Topic deleted", "success");
   };
