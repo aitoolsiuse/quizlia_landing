@@ -167,30 +167,26 @@ Replace those lines with:
       if (known.has(noteDoc.id)) continue;
 ```
 
-4b. The function's tail is a **lossless write-back**: re-read storage immediately before writing so a user edit (rename/move/delete landing during the Firestore round-trip — the merge now runs per-visit on an interactive page) is preserved; the iOS appends are unioned onto the fresh array by item `id` (ids are unique per item):
+4b. The function's tail is a **lossless write-back**: the three item-creation sites push into a `newItems` array (declared next to `chatChanged`) instead of mutating `existing`, and the write re-reads storage so a user edit *or deletion* landing during the Firestore round-trip survives — only genuinely-new iOS items prepend:
 
 ```ts
-    if (added) {
-      // Lossless write-back: re-read storage so a user edit that landed
-      // during the Firestore round-trip survives; union the iOS appends
-      // (items in `existing` but not in the fresh array) ahead of it.
+    if (newItems.length > 0) {
+      // Lossless write-back: re-read storage (a user edit or delete may
+      // have landed during the Firestore round-trip) and prepend only the
+      // genuinely-new iOS items — edits win, deletions stay deleted.
       let fresh: any[] = [];
       try {
         fresh = JSON.parse(localStorage.getItem(key) || "[]");
       } catch {
         fresh = [];
       }
-      if (!Array.isArray(fresh) || fresh.length === 0) {
-        localStorage.setItem(key, JSON.stringify(existing));
-      } else {
-        const appended = existing.filter((e: any) => !fresh.some((f: any) => f.id === e.id));
-        localStorage.setItem(key, JSON.stringify([...appended, ...fresh]));
-      }
+      if (!Array.isArray(fresh)) fresh = [];
+      localStorage.setItem(key, JSON.stringify([...newItems, ...fresh]));
     }
-    return added || chatChanged;
+    return newItems.length > 0 || chatChanged;
 ```
 
-Also update the function's doc comment line "were merged (caller may reload)" to "or chat histories changed (caller may refresh)".
+(The `added` variable disappears — `newItems.length` replaces it.) Also update the function's doc comment line "were merged (caller may reload)" to "or chat histories changed (caller may refresh)".
 
 - [ ] **Step 5: Add `pullRemoteChats` (after `mergeIOSNotesIntoContent`, before `loadLegacyProfileContent`)**
 
