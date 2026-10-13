@@ -15,6 +15,43 @@ export function localContentKey(profileId: number | string): string {
   return `content_${profileId}`;
 }
 
+// Longer-history-wins chat reconciliation for one topic's messages
+// (chats grow monotonically per topic; the longer array replaces the
+// shorter). Web message shape: { id, sender: "user" | "ai", text }.
+const writeChatIfLonger = (
+  profileId: number | string,
+  topicId: string,
+  remote: Array<{ id: string; sender: string; text: string }> | null | undefined
+): boolean => {
+  if (typeof window === "undefined" || !Array.isArray(remote) || remote.length === 0) return false;
+  const key = `chat_${profileId}_${topicId}`;
+  let local: unknown[] = [];
+  try {
+    local = JSON.parse(localStorage.getItem(key) || "[]");
+  } catch {
+    local = [];
+  }
+  if (!Array.isArray(local) || remote.length > local.length) {
+    localStorage.setItem(key, JSON.stringify(remote));
+    return true;
+  }
+  return false;
+};
+
+// Applies chat histories carried on pulled content items (web↔web sync).
+export function applyRemoteChats(
+  profileId: number | string,
+  items: any[]
+): boolean {
+  let changed = false;
+  for (const item of items) {
+    const sid = item?.sourceId;
+    if (typeof sid !== "string" || !sid) continue;
+    if (writeChatIfLonger(profileId, sid, item.chat)) changed = true;
+  }
+  return changed;
+}
+
 // localStorage + cloud write-through. Never throws to the caller — cloud
 // failures log and leave the local copy intact (retried on next write).
 export async function persistProfileContent(
@@ -30,10 +67,27 @@ export async function persistProfileContent(
   try {
     const uid = auth.currentUser.uid;
     const ref = doc(db, "users", uid, "profiles", String(profile.id), "notes", "userContent");
+
+    // Attach each topic's chat history to the CLOUD payload only (local
+    // content_ items stay chat-free); receiving devices reconcile with
+    // longer-history-wins via applyRemoteChats.
+    const items = Array.isArray(content) ? (content as any[]) : [];
+    const withChat = items.map((item) => {
+      const sid = item?.sourceId;
+      if (typeof sid !== "string" || !sid || typeof window === "undefined") return item;
+      try {
+        const chat = JSON.parse(localStorage.getItem(`chat_${profile.id}_${sid}`) || "[]");
+        if (Array.isArray(chat) && chat.length > 0) return { ...item, chat };
+      } catch {
+        // no chat stored for this topic
+      }
+      return item;
+    });
+
     await setDoc(ref, {
       clientOrigin: "web",
       updatedAt: new Date().toISOString(),
-      content: JSON.stringify(content),
+      content: JSON.stringify(withChat),
     });
   } catch (error) {
     console.warn("Cloud sync write failed (kept locally):", error);
@@ -72,6 +126,10 @@ export async function loadProfileContent(
       }
     }
 
+    if (Array.isArray(parsed)) {
+      applyRemoteChats(profile.id, parsed);
+    }
+
     // Merge notes synced from the iOS app (ios_* docs).
     const merged = await mergeIOSNotesIntoContent(profile);
     if (merged) {
@@ -94,7 +152,7 @@ export async function loadProfileContent(
 
 // Phase 2 pull: merge notes written by the iOS app (per-document docs
 // named ios_{id}) into the web content model. Returns true when new items
-// were merged (caller may reload). Idempotent: items already present (by
+// or chat histories changed (caller may refresh). Idempotent: items already present (by
 // sourceId) are skipped.
 export async function mergeIOSNotesIntoContent(
   profile: { id: number | string; email?: string }
@@ -124,11 +182,23 @@ export async function mergeIOSNotesIntoContent(
       try { return JSON.parse(raw); } catch { return null; }
     };
 
+    let chatChanged = false;
     for (const noteDoc of snap.docs) {
       if (!noteDoc.id.startsWith("ios_")) continue;
-      if (known.has(noteDoc.id)) continue;
 
       const d = noteDoc.data() as Record<string, unknown>;
+
+      // The iOS chat seed runs even for already-known topics: items are
+      // idempotence-keyed by sourceId, but chat is length-compared.
+      if (typeof d.chat === "string" && d.chat.trim().length > 0) {
+        if (writeChatIfLonger(profile.id, noteDoc.id, [
+          { id: "ios_seed", sender: "ai", text: d.chat },
+        ])) {
+          chatChanged = true;
+        }
+      }
+
+      if (known.has(noteDoc.id)) continue;
       // Route the note into the same folder it lives in on iOS. fid is the
       // cloud folder id (registry); legacy docs fall back to folderName; the
       // hidden General bucket means Unsorted (no folderId).
@@ -207,9 +277,33 @@ export async function mergeIOSNotesIntoContent(
     if (added) {
       localStorage.setItem(key, JSON.stringify(existing));
     }
-    return added;
+    return added || chatChanged;
   } catch (error) {
     console.warn("iOS notes merge failed:", error);
+    return false;
+  }
+}
+
+// Per-visit web↔web chat delivery: fetches the consolidated userContent
+// doc and reconciles chat histories. Content items themselves still merge
+// only on the first-visit path — this is chat-only. Returns true when any
+// chat history was updated.
+export async function pullRemoteChats(
+  profile: { id: number | string; email?: string }
+): Promise<boolean> {
+  if (!isFirebaseConfigured() || !db || !auth?.currentUser) return false;
+
+  try {
+    const uid = auth.currentUser.uid;
+    const ref = doc(db, "users", uid, "profiles", String(profile.id), "notes", "userContent");
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return false;
+    const raw = snap.data().content;
+    const items = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!Array.isArray(items)) return false;
+    return applyRemoteChats(profile.id, items);
+  } catch (error) {
+    console.warn("Chat pull failed:", error);
     return false;
   }
 }
