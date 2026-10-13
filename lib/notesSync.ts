@@ -177,7 +177,6 @@ export async function mergeIOSNotesIntoContent(
     const key = localContentKey(profile.id);
     const existing = JSON.parse(localStorage.getItem(key) || "[]");
     const known = new Set(existing.map((i: any) => i.sourceId));
-    let added = false;
 
     const mapType = (raw: unknown): string => {
       const t = String(raw || "").toLowerCase();
@@ -192,6 +191,7 @@ export async function mergeIOSNotesIntoContent(
     };
 
     let chatChanged = false;
+    const newItems: any[] = [];
     for (const noteDoc of snap.docs) {
       if (!noteDoc.id.startsWith("ios_")) continue;
 
@@ -269,38 +269,33 @@ export async function mergeIOSNotesIntoContent(
 
       let hasAny = false;
       if (note && typeof note === "object") {
-        existing.push({ id: `${noteDoc.id}_note`, ...base, type: "notes", data: note });
+        newItems.push({ id: `${noteDoc.id}_note`, ...base, type: "notes", data: note });
         hasAny = true;
       }
       if (Array.isArray(flashcards) && flashcards.length > 0) {
-        existing.push({ id: `${noteDoc.id}_flash`, ...base, type: "flashcards", data: { flashcards } });
+        newItems.push({ id: `${noteDoc.id}_flash`, ...base, type: "flashcards", data: { flashcards } });
         hasAny = true;
       }
       if (Array.isArray(quiz) && quiz.length > 0) {
-        existing.push({ id: `${noteDoc.id}_quiz`, ...base, type: "quiz", data: { quizzes: quiz } });
+        newItems.push({ id: `${noteDoc.id}_quiz`, ...base, type: "quiz", data: { quizzes: quiz } });
         hasAny = true;
       }
-      if (hasAny) added = true;
     }
 
-    if (added) {
-      // Lossless write-back: re-read storage so a user edit that landed
-      // during the Firestore round-trip survives; union the iOS appends
-      // (items in `existing` but not in the fresh array) ahead of it.
+    if (newItems.length > 0) {
+      // Lossless write-back: re-read storage (a user edit or delete may
+      // have landed during the Firestore round-trip) and prepend only the
+      // genuinely-new iOS items — edits win, deletions stay deleted.
       let fresh: any[] = [];
       try {
         fresh = JSON.parse(localStorage.getItem(key) || "[]");
       } catch {
         fresh = [];
       }
-      if (!Array.isArray(fresh) || fresh.length === 0) {
-        localStorage.setItem(key, JSON.stringify(existing));
-      } else {
-        const appended = existing.filter((e: any) => !fresh.some((f: any) => f.id === e.id));
-        localStorage.setItem(key, JSON.stringify([...appended, ...fresh]));
-      }
+      if (!Array.isArray(fresh)) fresh = [];
+      localStorage.setItem(key, JSON.stringify([...newItems, ...fresh]));
     }
-    return added || chatChanged;
+    return newItems.length > 0 || chatChanged;
   } catch (error) {
     console.warn("iOS notes merge failed:", error);
     return false;
