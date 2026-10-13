@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useToast } from "@/components/app/ToastContainer";
 import { canGenerate, incrementUsage } from "@/lib/subscription";
 import { persistProfileContent } from "@/lib/notesSync";
+import { auth } from "@/lib/firebase";
 import type { Profile, ContentItem } from "@/lib/types";
 
 interface UseGenerateContentOptions {
@@ -94,21 +95,26 @@ export function useGenerateContent({ profile, targetFolderId, onGenerated }: Use
         ...(fileData && { fileData })
       };
 
-      // Generate all three types in parallel
+      // Generate all three types in parallel. Attach the Firebase ID token
+      // so the server can enforce per-account quotas (see /api/generate).
+      const authToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+      const requestHeaders: Record<string, string> = { "Content-Type": "application/json" };
+      if (authToken) requestHeaders["Authorization"] = `Bearer ${authToken}`;
+
       const [noteResponse, flashcardResponse, quizResponse] = await Promise.all([
         fetch("/api/generate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: requestHeaders,
           body: JSON.stringify({ ...requestBody, type: "note" }),
         }),
         fetch("/api/generate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: requestHeaders,
           body: JSON.stringify({ ...requestBody, type: "flashcard" }),
         }),
         fetch("/api/generate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: requestHeaders,
           body: JSON.stringify({ ...requestBody, type: "quiz" }),
         }),
       ]);

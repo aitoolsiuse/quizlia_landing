@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
 export const dynamic = 'force-dynamic';
 
@@ -101,8 +104,76 @@ function cleanJSONString(jsonString: string): string {
   return str.trim();
 }
 
+// Server-side quota enforcement. Active only when FIREBASE_SERVICE_ACCOUNT
+// is configured (Netlify env); without it the route behaves as before
+// (local/dev mode). One browser "generation" fires THREE requests here
+// (note + flashcard + quiz), so limits are expressed in request units:
+// free = 3 requests lifetime (= 1 generation), individual = 15/day
+// (= 5 generations), family = 45/day (= 15 generations).
+async function checkQuota(request: NextRequest): Promise<Response | null> {
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!serviceAccount) return null;
+
+  const authHeader = request.headers.get("authorization") || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) {
+    return NextResponse.json({ error: "Sign in to generate content" }, { status: 401 });
+  }
+
+  try {
+    if (!getApps().length) {
+      initializeApp({ credential: cert(JSON.parse(serviceAccount)) });
+    }
+
+    const decoded = await getAuth().verifyIdToken(token);
+    const uid = decoded.uid;
+    const db = getFirestore();
+
+    // Plan from the subscription mirror (best server-side truth).
+    const userSnap = await db.collection("users").doc(uid).get();
+    const subs = (userSnap.data()?.subscriptions ?? {}) as Record<string, { active?: boolean }>;
+    const hasActive = Object.values(subs).some((s) => s?.active);
+    const isFamily = subs.family_yearly?.active === true;
+    const dailyLimit = hasActive ? (isFamily ? 45 : 15) : 0;
+
+    const today = new Date().toISOString().split("T")[0];
+    const quotaRef = db.collection("generationQuota").doc(uid);
+    const quotaSnap = await quotaRef.get();
+    const data = quotaSnap.data() as { date?: string; used?: number; freeUsed?: boolean } | undefined;
+    const usedToday = data?.date === today ? data?.used ?? 0 : 0;
+
+    if (!hasActive) {
+      // Free tier: one lifetime generation (= 3 request units).
+      if (data?.freeUsed) {
+        return NextResponse.json(
+          { error: "Your free note has been used. Upgrade to keep generating.", upgrade: true },
+          { status: 429 }
+        );
+      }
+      await quotaRef.set({ date: today, used: usedToday + 1, freeUsed: true }, { merge: true });
+    } else {
+      if (usedToday >= dailyLimit) {
+        return NextResponse.json(
+          { error: `Daily generation limit reached (${isFamily ? 15 : 5} per day). Resets at midnight.`, upgrade: true },
+          { status: 429 }
+        );
+      }
+      await quotaRef.set({ date: today, used: usedToday + 1 }, { merge: true });
+    }
+
+    return null; // allowed
+  } catch (error) {
+    console.error("Quota check failed:", error);
+    return NextResponse.json({ error: "Could not verify generation quota" }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // Server-side quota gate (no-op unless FIREBASE_SERVICE_ACCOUNT is set).
+    const quotaError = await checkQuota(request);
+    if (quotaError) return quotaError;
+
     const { type, content, fileData, mimeType } = await request.json();
 
     if (!GEMINI_API_KEY) {
