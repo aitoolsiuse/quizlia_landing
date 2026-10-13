@@ -82,10 +82,11 @@ The function's try block currently builds the `setDoc` call with `content: JSON.
     const ref = doc(db, "users", uid, "profiles", String(profile.id), "notes", "userContent");
 
     // Attach each topic's chat history to the CLOUD payload only (local
-    // content_ items stay chat-free); receiving devices reconcile with
-    // longer-history-wins via applyRemoteChats.
-    const items = Array.isArray(content) ? (content as any[]) : [];
-    const withChat = items.map((item) => {
+    // content_ items stay chat-free); non-array content (corrupt storage)
+    // passes through verbatim rather than being clobbered to [].
+    let payload: unknown = content;
+    if (Array.isArray(content)) {
+      payload = (content as any[]).map((item) => {
       const sid = item?.sourceId;
       if (typeof sid !== "string" || !sid || typeof window === "undefined") return item;
       try {
@@ -95,12 +96,13 @@ The function's try block currently builds the `setDoc` call with `content: JSON.
         // no chat stored for this topic
       }
       return item;
-    });
+      });
+    }
 
     await setDoc(ref, {
       clientOrigin: "web",
       updatedAt: new Date().toISOString(),
-      content: JSON.stringify(withChat),
+      content: JSON.stringify(payload),
     });
   } catch (error) {
     console.warn("Cloud sync write failed (kept locally):", error);
@@ -111,13 +113,25 @@ The function's try block currently builds the `setDoc` call with `content: JSON.
 
 - [ ] **Step 3: Chat delivery on the first-visit path in `loadProfileContent`**
 
-Inside `loadProfileContent`'s try block, after the `if (parsed && typeof window !== "undefined") { localStorage.setItem(...) }` block and before the `// Merge notes synced from the iOS app` comment, insert:
+Inside `loadProfileContent`'s try block, the cache write strips chat (the cloud payload carries `chat` on items; local `content_` must stay chat-free), then chat is applied from the unstripped array:
 
 ```ts
+      if (parsed && typeof window !== "undefined") {
+        // Chat rides the cloud payload only — strip it before caching so
+        // local content_ items stay chat-free (histories live in their own
+        // chat_<pid>_<topicId> keys, applied below).
+        const cacheable = Array.isArray(parsed)
+          ? parsed.map(({ chat: _chat, ...rest }: any) => rest)
+          : parsed;
+        localStorage.setItem(localContentKey(profile.id), JSON.stringify(cacheable));
+      }
+
     if (Array.isArray(parsed)) {
       applyRemoteChats(profile.id, parsed);
     }
 ```
+
+(The `if (Array.isArray(parsed)) { applyRemoteChats(...) }` insert point is unchanged — after the cache write, before the `// Merge notes synced from the iOS app` comment.)
 
 - [ ] **Step 4: iOS seed answers + known-topic chat in `mergeIOSNotesIntoContent`**
 
@@ -153,7 +167,30 @@ Replace those lines with:
       if (known.has(noteDoc.id)) continue;
 ```
 
-4b. The function currently ends `return added;` (inside the try). Change that line to `return added || chatChanged;`. Also update the function's doc comment line "were merged (caller may reload)" to "or chat histories changed (caller may refresh)".
+4b. The function's tail is a **lossless write-back**: re-read storage immediately before writing so a user edit (rename/move/delete landing during the Firestore round-trip — the merge now runs per-visit on an interactive page) is preserved; the iOS appends are unioned onto the fresh array by item `id` (ids are unique per item):
+
+```ts
+    if (added) {
+      // Lossless write-back: re-read storage so a user edit that landed
+      // during the Firestore round-trip survives; union the iOS appends
+      // (items in `existing` but not in the fresh array) ahead of it.
+      let fresh: any[] = [];
+      try {
+        fresh = JSON.parse(localStorage.getItem(key) || "[]");
+      } catch {
+        fresh = [];
+      }
+      if (!Array.isArray(fresh) || fresh.length === 0) {
+        localStorage.setItem(key, JSON.stringify(existing));
+      } else {
+        const appended = existing.filter((e: any) => !fresh.some((f: any) => f.id === e.id));
+        localStorage.setItem(key, JSON.stringify([...appended, ...fresh]));
+      }
+    }
+    return added || chatChanged;
+```
+
+Also update the function's doc comment line "were merged (caller may reload)" to "or chat histories changed (caller may refresh)".
 
 - [ ] **Step 5: Add `pullRemoteChats` (after `mergeIOSNotesIntoContent`, before `loadLegacyProfileContent`)**
 
