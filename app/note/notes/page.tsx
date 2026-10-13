@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Sidebar } from "@/components/app/Sidebar";
 import { useToast } from "@/components/app/ToastContainer";
 import { getAllStudyGuides, categoryColors, difficultyColors, StudyGuide } from "@/lib/studyGuide";
-import { persistProfileContent, loadProfileContent } from "@/lib/notesSync";
+import { persistProfileContent, loadProfileContent, mergeIOSNotesIntoContent, pullRemoteChats } from "@/lib/notesSync";
 import { syncProfileFolders } from "@/lib/folderSync";
 import { CreateFolderModal } from "@/components/app/CreateFolderModal";
 import { RenameModal } from "@/components/app/RenameModal";
@@ -139,28 +139,47 @@ function NotesExplorer() {
     fetchStudyGuides();
   }, []);
 
-  // Folder registry sync (signed-in only; no-ops to the local list otherwise).
-  // Remote tombstones arrive here and unsort their notes via the hook.
+  // Per-visit cloud sync (signed-in only; each piece no-ops when signed out
+  // or unchanged): folder registry (remote tombstones unsort via the hook),
+  // the idempotent iOS-notes merge, and web↔web chat reconciliation.
   useEffect(() => {
     if (!profile) return;
     let cancelled = false;
-    syncProfileFolders(profile, {
-      onRemoteDelete: (folderId) => {
-        if (!profile || typeof window === "undefined") return;
-        const storedContent = localStorage.getItem(`content_${profile.id}`);
-        if (storedContent) {
-          const content = JSON.parse(storedContent).map((item: ContentItem) =>
-            item.folderId === folderId ? { ...item, folderId: undefined } : item
-          );
-          persistProfileContent(profile, content);
-        }
-        setTopics((prev) =>
-          prev.map((t) => (t.folderId === folderId ? { ...t, folderId: undefined } : t))
+
+    const stripFolderFromContent = (folderId: string) => {
+      if (!profile || typeof window === "undefined") return;
+      const storedContent = localStorage.getItem(`content_${profile.id}`);
+      if (storedContent) {
+        const content = JSON.parse(storedContent).map((item: ContentItem) =>
+          item.folderId === folderId ? { ...item, folderId: undefined } : item
         );
-      },
-    }).then((merged) => {
-      if (!cancelled) setFolders(merged as Folder[]);
-    });
+        persistProfileContent(profile, content);
+      }
+      setTopics((prev) =>
+        prev.map((t) => (t.folderId === folderId ? { ...t, folderId: undefined } : t))
+      );
+    };
+
+    (async () => {
+      const [mergedFolders, notesAdded] = await Promise.all([
+        syncProfileFolders(profile, { onRemoteDelete: stripFolderFromContent }),
+        mergeIOSNotesIntoContent(profile),
+        pullRemoteChats(profile),
+      ]);
+      if (cancelled) return;
+      setFolders(mergedFolders as Folder[]);
+      if (notesAdded && typeof window !== "undefined") {
+        const stored = localStorage.getItem(`content_${profile.id}`);
+        if (stored) {
+          try {
+            setTopics(buildTopics(JSON.parse(stored)));
+          } catch {
+            // leave the current list in place
+          }
+        }
+      }
+    })();
+
     return () => {
       cancelled = true;
     };

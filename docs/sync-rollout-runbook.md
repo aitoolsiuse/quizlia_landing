@@ -75,8 +75,8 @@ service-account key.**
 - [ ] Two iOS devices, same linked account: note created offline on one appears
       on the other after launch
 - [ ] Note created on web appears on iOS; note created on iOS appears on web
-      (web side pulls iOS notes on a device's first visit / when local
-      content is empty; broader pull cadence is a documented follow-up)
+      (web side pulls iOS notes on every My Notes visit; web-created note
+      content still merges on a device's first visit)
 - [ ] Anonymous iOS user creates note → "Enable Sync" (link email) → data
       persists under the upgraded UID; sign in with the same email on web → sees it
 - [ ] Promo code redemption works on both platforms (quailizy `promoCodes`)
@@ -93,6 +93,12 @@ service-account key.**
 - [ ] With a web-origin folder present: iOS registry writes settle within
       ≤2 passes per launch (watch the Firestore console; continuous writes
       indicate the rename-tracking or adopt loops regressed)
+- [ ] Chat conversation held on browser A appears on browser B after
+      visiting My Notes signed in
+- [ ] An iOS note's AI seed answer appears as the web topic's opening chat
+      message (when no local conversation exists)
+- [ ] iOS note created after the web device has cached content appears on
+      the web after visiting My Notes (per-visit pull cadence)
 
 ## 6. Release
 
