@@ -161,6 +161,8 @@ function NotesExplorer() {
     };
 
     (async () => {
+      // pullRemoteChats' result is intentionally unused here: chat lives in
+      // its own keys and is read fresh by the topic page on open.
       const [mergedFolders, notesAdded] = await Promise.all([
         syncProfileFolders(profile, { onRemoteDelete: stripFolderFromContent }),
         mergeIOSNotesIntoContent(profile),

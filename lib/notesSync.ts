@@ -69,25 +69,28 @@ export async function persistProfileContent(
     const ref = doc(db, "users", uid, "profiles", String(profile.id), "notes", "userContent");
 
     // Attach each topic's chat history to the CLOUD payload only (local
-    // content_ items stay chat-free); receiving devices reconcile with
-    // longer-history-wins via applyRemoteChats.
-    const items = Array.isArray(content) ? (content as any[]) : [];
-    const withChat = items.map((item) => {
-      const sid = item?.sourceId;
-      if (typeof sid !== "string" || !sid || typeof window === "undefined") return item;
-      try {
-        const chat = JSON.parse(localStorage.getItem(`chat_${profile.id}_${sid}`) || "[]");
-        if (Array.isArray(chat) && chat.length > 0) return { ...item, chat };
-      } catch {
-        // no chat stored for this topic
-      }
-      return item;
-    });
+    // content_ items stay chat-free); non-array content (corrupt storage)
+    // passes through verbatim rather than being clobbered to []. Receiving
+    // devices reconcile with longer-history-wins via applyRemoteChats.
+    let payload: unknown = content;
+    if (Array.isArray(content)) {
+      payload = (content as any[]).map((item) => {
+        const sid = item?.sourceId;
+        if (typeof sid !== "string" || !sid || typeof window === "undefined") return item;
+        try {
+          const chat = JSON.parse(localStorage.getItem(`chat_${profile.id}_${sid}`) || "[]");
+          if (Array.isArray(chat) && chat.length > 0) return { ...item, chat };
+        } catch {
+          // no chat stored for this topic
+        }
+        return item;
+      });
+    }
 
     await setDoc(ref, {
       clientOrigin: "web",
       updatedAt: new Date().toISOString(),
-      content: JSON.stringify(withChat),
+      content: JSON.stringify(payload),
     });
   } catch (error) {
     console.warn("Cloud sync write failed (kept locally):", error);
@@ -122,7 +125,13 @@ export async function loadProfileContent(
       const raw = snap.data().content;
       parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
       if (parsed && typeof window !== "undefined") {
-        localStorage.setItem(localContentKey(profile.id), JSON.stringify(parsed));
+        // Chat rides the cloud payload only — strip it before caching so
+        // local content_ items stay chat-free (histories live in their own
+        // chat_<pid>_<topicId> keys, applied below).
+        const cacheable = Array.isArray(parsed)
+          ? parsed.map(({ chat: _chat, ...rest }: any) => rest)
+          : parsed;
+        localStorage.setItem(localContentKey(profile.id), JSON.stringify(cacheable));
       }
     }
 
@@ -275,7 +284,21 @@ export async function mergeIOSNotesIntoContent(
     }
 
     if (added) {
-      localStorage.setItem(key, JSON.stringify(existing));
+      // Lossless write-back: re-read storage so a user edit that landed
+      // during the Firestore round-trip survives; union the iOS appends
+      // (items in `existing` but not in the fresh array) ahead of it.
+      let fresh: any[] = [];
+      try {
+        fresh = JSON.parse(localStorage.getItem(key) || "[]");
+      } catch {
+        fresh = [];
+      }
+      if (!Array.isArray(fresh) || fresh.length === 0) {
+        localStorage.setItem(key, JSON.stringify(existing));
+      } else {
+        const appended = existing.filter((e: any) => !fresh.some((f: any) => f.id === e.id));
+        localStorage.setItem(key, JSON.stringify([...appended, ...fresh]));
+      }
     }
     return added || chatChanged;
   } catch (error) {
