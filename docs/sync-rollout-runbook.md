@@ -111,7 +111,9 @@ service-account key.**
   `docs/superpowers/specs/2026-10-12-folder-sync-design.md`). Notes pulled
   before this landed may still sit in web "Unsorted" / the iOS "From Web"
   folder — one-time residue, not auto-repaired.
-- **Chat history sync** — optional Phase 3 per the spec, not built.
+- Chat history syncs web↔web (longer-history-wins, per-visit pull) and iOS
+  AI seed answers import to web (spec: `docs/superpowers/specs/2026-10-13-sync-completion-design.md`).
+  Web→iOS chat is not built — iOS has no persistent chat history to receive it.
 
 Note: `docs/quailizy-firebase-setup.md` (iOS repo, branch `release/1.0.12`)
 predates the phase-2 commits — its "What is NOT in this phase" list is stale
