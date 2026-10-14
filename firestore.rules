@@ -13,20 +13,28 @@ service cloud.firestore {
     }
 
 
+    // Super admins: users/{uid}.admin == true, set directly in the
+    // Firebase console (Admin SDK bypasses rules). A get() on a missing
+    // doc fails closed — the write is denied.
+    function isAdmin() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('admin', false) == true;
+    }
+
+
     // Public study guides.
     // Readable by anyone (public study-guide pages + SSR REST fetch are
-    // unauthenticated). Signed-in users may publish their own notes as
-    // UNLISTED guides and unpublish them; featuring a guide (listed:true)
-    // and writing seeded guides stay admin-only (Admin SDK bypasses rules).
+    // unauthenticated). Only super admins (users/{uid}.admin) publish;
+    // their guides are listed library content. Owners keep unpublish
+    // (delete) on docs they created under the old model.
     match /notes/{noteId} {
       allow read: if true;
-      allow create: if request.auth != null
-                    && request.resource.data.ownerUid == request.auth.uid
-                    && request.resource.data.listed == false;
-      allow update: if request.auth != null
-                    && resource.data.ownerUid == request.auth.uid
-                    && resource.data.listed == false
-                    && request.resource.data.listed == false;
+      // Publishing is super-admin-only now; admin publishes go straight
+      // into the public library (listed). Legacy owners keep unpublish.
+      allow create: if isAdmin()
+                    && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isAdmin()
+                    && resource.data.ownerUid == request.auth.uid;
       allow delete: if request.auth != null
                     && resource.data.ownerUid == request.auth.uid;
     }
@@ -35,7 +43,17 @@ service cloud.firestore {
     // (web + iOS share this schema). The migration script (Admin SDK)
     // moves the old email-keyed docs into these paths.
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Owner-writable EXCEPT the admin flag: the post-write value of
+      // `admin` (carried over when the write omits the field) must equal
+      // the pre-write value, so nobody can self-promote. The console /
+      // Admin SDK bypass rules to set it.
+      allow create, update: if request.auth != null && request.auth.uid == userId
+                    && request.resource.data.get('admin', resource.data.get('admin', false))
+                       == resource.data.get('admin', false);
+
+      allow delete: if request.auth != null && request.auth.uid == userId;
 
       match /profiles/{profileId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
