@@ -622,9 +622,10 @@ export default function TopicDetailPage() {
                     <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
                       Quick Summary
                     </h3>
-                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                      {topic.note.quick_summary}
-                    </p>
+                    <MarkdownText
+                      text={topic.note.quick_summary}
+                      className="text-gray-700 dark:text-gray-300 leading-relaxed"
+                    />
                   </div>
                 )}
 

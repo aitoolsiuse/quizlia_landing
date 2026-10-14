@@ -71,6 +71,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pu
     const contents = Array.isArray(body.contents) ? [...body.contents] : [];
     if (contents[0] && Array.isArray(contents[0].parts)) {
       contents[0] = { ...contents[0], parts: [...contents[0].parts, { text: contract }] };
+    } else {
+      console.warn("iOS proxy: no parts array to append the format contract to");
     }
 
     // Forward only what the Gemini REST API accepts; the model is fixed
