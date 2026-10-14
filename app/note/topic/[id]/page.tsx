@@ -12,6 +12,7 @@ import { db, auth } from "@/lib/firebase";
 import { doc, setDoc, deleteDoc } from "firebase/firestore";
 import { Sidebar } from "@/components/app/Sidebar";
 import { RenameModal } from "@/components/app/RenameModal";
+import { MarkdownText } from "@/components/app/MarkdownText";
 
 type TabType = "note" | "flashcards" | "quiz";
 
@@ -657,9 +658,10 @@ export default function TopicDetailPage() {
                           <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
                             {section.title}
                           </h4>
-                          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-                            {section.content}
-                          </p>
+                          <MarkdownText
+                            text={section.content}
+                            className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed"
+                          />
                           {section.keyTerms && section.keyTerms.length > 0 && (
                             <div className="flex flex-wrap gap-2 mt-3">
                               {section.keyTerms.map((term, tIndex) => (
@@ -796,8 +798,9 @@ export default function TopicDetailPage() {
                         ))}
                       </div>
                       {question.explanation && (
-                        <div className="mt-3 ml-8 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-800 dark:text-blue-200">
-                          <span className="font-medium">Explanation:</span> {question.explanation}
+                        <div className="mt-3 ml-8 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-800 dark:text-blue-200 [&_strong]:font-semibold">
+                          <span className="font-medium">Explanation:</span>
+                          <MarkdownText text={question.explanation} />
                         </div>
                       )}
                     </div>
@@ -844,7 +847,7 @@ export default function TopicDetailPage() {
 
                 {message.sender === "ai" && (
                   <div className="bg-gray-100 dark:bg-gray-800 rounded-xl rounded-bl-sm p-3 max-w-[85%]">
-                    <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">{message.text}</p>
+                    <MarkdownText text={message.text} className="text-sm text-gray-900 dark:text-white" />
                   </div>
                 )}
 
