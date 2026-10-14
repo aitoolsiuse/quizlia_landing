@@ -722,6 +722,15 @@ enum MarkdownFormatter {
             .paragraphStyle: paragraphStyle
         ]
 
+        // Separators between list items carry the list paragraph style so
+        // multi-item lists line-break like the web renderer's <li> elements
+        // (found during Task 6: without them items run together on one line).
+        let listAttributes: [NSAttributedString.Key: Any] = [
+            .font: baseFont,
+            .foregroundColor: baseColor,
+            .paragraphStyle: listStyle
+        ]
+
         for (blockIndex, block) in parse(text).enumerated() {
             if blockIndex > 0 {
                 result.append(NSAttributedString(string: "\n", attributes: baseAttributes))
@@ -735,11 +744,17 @@ enum MarkdownFormatter {
                     appendInline(line, to: result, baseFont: baseFont, boldFont: boldFont, italicFont: italicFont, baseColor: baseColor, paragraphStyle: paragraphStyle)
                 }
             case .bulletList(let items):
-                for item in items {
+                for (itemIndex, item) in items.enumerated() {
+                    if itemIndex > 0 {
+                        result.append(NSAttributedString(string: "\n", attributes: listAttributes))
+                    }
                     appendInline("• " + item, to: result, baseFont: baseFont, boldFont: boldFont, italicFont: italicFont, baseColor: baseColor, paragraphStyle: listStyle)
                 }
             case .numberedList(let items):
                 for (itemIndex, item) in items.enumerated() {
+                    if itemIndex > 0 {
+                        result.append(NSAttributedString(string: "\n", attributes: listAttributes))
+                    }
                     appendInline("\(itemIndex + 1). " + item, to: result, baseFont: baseFont, boldFont: boldFont, italicFont: italicFont, baseColor: baseColor, paragraphStyle: listStyle)
                 }
             }
