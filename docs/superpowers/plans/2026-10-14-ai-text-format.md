@@ -619,6 +619,18 @@ to:
 
 (Both are guarded by `&&` on the value in the existing JSX — keep those guards; MarkdownText's `text` prop is `string`, and the guards narrow it.)
 
+Chat bubble (~467, `app/note/[slug]/page.tsx` — inside the `{message.sender === "ai" && (` block; surfaced during Task 4) — change:
+
+```tsx
+                    <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">{message.text}</p>
+```
+
+to:
+
+```tsx
+                    <MarkdownText text={message.text} className="text-sm text-gray-900 dark:text-white" />
+```
+
 - [ ] **Step 5: Verify types + lint**
 
 Run: `npx tsc --noEmit` → no errors.
