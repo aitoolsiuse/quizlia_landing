@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/app/ToastContainer";
 import { ThemeProvider } from "@/components/app/ThemeProvider";
+import { AppPromoQRCard } from "@/components/app/AppPromoQRCard";
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -43,7 +44,12 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <AppPromoQRCard />
+      {children}
+    </>
+  );
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
