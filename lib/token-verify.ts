@@ -80,7 +80,9 @@ export async function verifyIdToken(token: string): Promise<VerifiedToken | null
     const jwk = keys.find((k) => k.kid === header.kid);
     if (!jwk) return null;
 
-    const signed = b64urlToBuffer(`${parts[0]}.${parts[1]}`);
+    // Signed content is the LITERAL ASCII text "header.payload" (the
+    // base64url segments as text, dot included) — NOT their decoded bytes.
+    const signed = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
     const signature = b64urlToBuffer(parts[2]);
     if (!(await verifyRs256(jwk, signed, signature))) return null;
 
