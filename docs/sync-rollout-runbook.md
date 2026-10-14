@@ -56,11 +56,10 @@ node scripts/create-promocodes.mjs --count 20 --prefix QUIZ      # random batch 
 node scripts/create-promocodes.mjs LAUNCH100 --days 30 --dry-run # preview without writing
 ```
 
-Docs land in `promoCodes/{CODE}` with the shape iOS validates
-(`expirationDate` Timestamp, `isActive: true`, `usersUsed: []`). Redeem a
-test code on iOS afterwards (matrix below). Known gap: the WEB promo field
-currently grants a free month for ANY text — validation there is a logged
-follow-up.
+Docs land in `promoCodes/{CODE}` with the shape both platforms validate
+(`expirationDate` Timestamp, `isActive: true`, `usersUsed: []` — the web
+validates too since f703e59). Redeem a test code on each platform
+afterwards (matrix below).
 
 ## 4. iOS build (Mac)
 
@@ -120,9 +119,6 @@ follow-up.
   AI seed answers import to web (spec: `docs/superpowers/specs/2026-10-13-sync-completion-design.md`).
   Web→iOS chat is not built — iOS has no persistent chat history to receive it.
 
-- **Web promo-code validation** — `applyPromoCode` on web grants 1 free month
-  for any entered text; it should validate against the `promoCodes`
-  collection like iOS does (isActive / expirationDate / usersUsed).
 - Note: `docs/quailizy-firebase-setup.md` (iOS repo, branch `release/1.0.12`)
 predates the phase-2 commits — its "What is NOT in this phase" list is stale
 (cross-platform pull shipped); this runbook supersedes it for rollout steps.
