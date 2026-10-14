@@ -8,7 +8,8 @@ import { FlashcardStudyMode } from "@/components/app/FlashcardStudyMode";
 import { QuizStudyMode } from "@/components/app/QuizStudyMode";
 import { Topic, getYouTubeThumbnail, getSourceIcon, getYouTubeEmbedUrl } from "@/lib/types";
 import { persistProfileContent, loadProfileContent } from "@/lib/notesSync";
-import { auth } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
+import { doc, setDoc, deleteDoc } from "firebase/firestore";
 import { Sidebar } from "@/components/app/Sidebar";
 import { RenameModal } from "@/components/app/RenameModal";
 
@@ -205,36 +206,59 @@ export default function TopicDetailPage() {
   }, [publishedKey]);
 
   const handlePublish = async () => {
-    if (!topic || isPublishing) return;
+    if (!topic || isPublishing || !db || !auth?.currentUser) {
+      if (!auth?.currentUser) showToast("Sign in to publish a note", "error");
+      return;
+    }
     setIsPublishing(true);
     try {
-      const token = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
-      const response = await fetch("/api/publish", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        body: JSON.stringify({
-          title: topic.title,
-          note: topic.note,
-          flashcards: topic.flashcards,
-          quiz: topic.quiz,
-        }),
+      const slugify = (text: string) =>
+        text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "note";
+      const slug = `${slugify(topic.title)}-${Date.now().toString(36)}`;
+      const now = new Date().toISOString();
+
+      // Same shape as seeded guides so the public page renders it
+      // identically. Rules enforce ownerUid + listed:false on client writes.
+      await setDoc(doc(db, "notes", slug), {
+        slug,
+        title: topic.title,
+        category: "community",
+        difficulty: "medium",
+        sourceChannel: "QuizliAI user",
+        youtubeId: "",
+        createdAt: now,
+        updatedAt: now,
+        tldr:
+          topic.note?.key_findings && topic.note.key_findings.length > 0
+            ? topic.note.key_findings.slice(0, 5)
+            : [topic.note?.quick_summary].filter(Boolean),
+        sections: [
+          ...(topic.note?.quick_summary
+            ? [{ title: "Summary", content: topic.note.quick_summary, keyTerms: [] }]
+            : []),
+          ...(topic.note?.detailed_notes
+            ? [{
+                title: "Detailed Notes",
+                content: topic.note.detailed_notes,
+                keyTerms: topic.note?.key_findings ?? [],
+              }]
+            : []),
+        ],
+        quiz: topic.quiz ?? [],
+        flashcards: topic.flashcards ?? [],
+        listed: false,
+        ownerUid: auth.currentUser.uid,
+        publishedAt: now,
       });
-      const result = await response.json();
-      if (result.slug) {
-        localStorage.setItem(publishedKey, result.slug);
-        setPublishedSlug(result.slug);
-        const url = `${window.location.origin}/note/${result.slug}`;
-        try {
-          await navigator.clipboard.writeText(url);
-          showToast("Published — link copied to clipboard", "success");
-        } catch {
-          showToast("Published", "success");
-        }
-      } else {
-        showToast(result.error || "Couldn't publish this note", "error");
+
+      localStorage.setItem(publishedKey, slug);
+      setPublishedSlug(slug);
+      const url = `${window.location.origin}/note/${slug}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast("Published — link copied to clipboard", "success");
+      } catch {
+        showToast("Published", "success");
       }
     } catch {
       showToast("Couldn't publish this note", "error");
@@ -244,26 +268,13 @@ export default function TopicDetailPage() {
   };
 
   const handleUnpublish = async () => {
-    if (!publishedSlug || isPublishing) return;
+    if (!publishedSlug || isPublishing || !db) return;
     setIsPublishing(true);
     try {
-      const token = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
-      const response = await fetch("/api/publish", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        body: JSON.stringify({ slug: publishedSlug }),
-      });
-      const result = await response.json();
-      if (result.ok) {
-        localStorage.removeItem(publishedKey);
-        setPublishedSlug(null);
-        showToast("Note unpublished", "success");
-      } else {
-        showToast(result.error || "Couldn't unpublish", "error");
-      }
+      await deleteDoc(doc(db, "notes", publishedSlug));
+      localStorage.removeItem(publishedKey);
+      setPublishedSlug(null);
+      showToast("Note unpublished", "success");
     } catch {
       showToast("Couldn't unpublish", "error");
     } finally {

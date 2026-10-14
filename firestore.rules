@@ -3,11 +3,21 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Public study guides.
-    // Readable by anyone (public study-guide pages + SSR REST fetch are unauthenticated).
-    // Writable only via the Admin SDK (scripts/seed-study-guides.ts) — rules never apply to it.
+    // Readable by anyone (public study-guide pages + SSR REST fetch are
+    // unauthenticated). Signed-in users may publish their own notes as
+    // UNLISTED guides and unpublish them; featuring a guide (listed:true)
+    // and writing seeded guides stay admin-only (Admin SDK bypasses rules).
     match /notes/{noteId} {
       allow read: if true;
-      allow write: if false;
+      allow create: if request.auth != null
+                    && request.resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.listed == false;
+      allow update: if request.auth != null
+                    && resource.data.ownerUid == request.auth.uid
+                    && resource.data.listed == false
+                    && request.resource.data.listed == false;
+      allow delete: if request.auth != null
+                    && resource.data.ownerUid == request.auth.uid;
     }
 
     // User data is UID-keyed and readable/writable only by its owner
