@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/app/ToastContainer";
 import { canGenerate, incrementUsage } from "@/lib/subscription";
 import { persistProfileContent } from "@/lib/notesSync";
@@ -17,6 +18,7 @@ interface UseGenerateContentOptions {
 
 export function useGenerateContent({ profile, targetFolderId, onGenerated }: UseGenerateContentOptions) {
   const { showToast } = useToast();
+  const router = useRouter();
   const [contentType, setContentType] = useState("url");
   const [contentInput, setContentInput] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -101,11 +103,19 @@ export function useGenerateContent({ profile, targetFolderId, onGenerated }: Use
       // against the account's cross-platform budget.
       const setId = `gen_${Date.now().toString(36)}`;
 
+      // The server's quota gate requires a signed-in caller; without a
+      // session the requests would only ever 401 — prompt instead of firing.
+      if (!auth?.currentUser) {
+        showToast("Sign in to generate content — it's free.", "error");
+        router.push("/auth/login");
+        return;
+      }
+
       // Generate all three types in parallel. Attach the Firebase ID token
       // so the server can enforce per-account quotas (see /api/generate).
-      const authToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+      const authToken = await auth.currentUser.getIdToken();
       const requestHeaders: Record<string, string> = { "Content-Type": "application/json" };
-      if (authToken) requestHeaders["Authorization"] = `Bearer ${authToken}`;
+      requestHeaders["Authorization"] = `Bearer ${authToken}`;
 
       const [noteResponse, flashcardResponse, quizResponse] = await Promise.all([
         fetch("/api/generate", {
