@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { meterGeneration, meterChat } from "@/lib/quota";
 import { resolveCaller, exchangeRefreshToken } from "@/lib/token-verify";
+import { FREE_TEXT_FORMAT_CONTRACT, JSON_FORMAT_CONTRACT } from "@/lib/format-contract";
 
 export const dynamic = "force-dynamic";
 
@@ -64,13 +65,21 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pu
   try {
     const body = await request.json();
 
+    // Append the format contract as the LAST text part so it takes
+    // precedence over prompt text older app versions still send.
+    const contract = purpose === "chat" ? FREE_TEXT_FORMAT_CONTRACT : JSON_FORMAT_CONTRACT;
+    const contents = Array.isArray(body.contents) ? [...body.contents] : [];
+    if (contents[0] && Array.isArray(contents[0].parts)) {
+      contents[0] = { ...contents[0], parts: [...contents[0].parts, { text: contract }] };
+    }
+
     // Forward only what the Gemini REST API accepts; the model is fixed
     // server-side so it can change without an app release.
     const upstream = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: body.contents,
+        contents,
         generationConfig: body.generationConfig,
       }),
     });

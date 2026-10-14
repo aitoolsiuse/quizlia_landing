@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { meterGeneration } from "@/lib/quota";
 import { resolveCaller } from "@/lib/token-verify";
+import { JSON_FORMAT_CONTRACT } from "@/lib/format-contract";
 
 export const dynamic = 'force-dynamic';
 
@@ -180,10 +181,10 @@ export async function POST(request: NextRequest) {
       });
 
       // Add the prompt after the video
-      parts.push({ text: prompt });
+      parts.push({ text: `${prompt}\n\n${JSON_FORMAT_CONTRACT}` });
     } else {
       // For non-YouTube content, add prompt first
-      const fullPrompt = `${prompt}\n\nCONTENT:\n${content}`;
+      const fullPrompt = `${prompt}\n\nCONTENT:\n${content}\n\n${JSON_FORMAT_CONTRACT}`;
       parts.push({ text: fullPrompt });
 
       // If file data is provided (image or PDF), add it as inline data

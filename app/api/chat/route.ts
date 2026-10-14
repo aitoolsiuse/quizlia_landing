@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FREE_TEXT_FORMAT_CONTRACT } from "@/lib/format-contract";
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +36,9 @@ Instructions:
 - If the specific information is not mentioned in the document, respond politely: "I don't see information about [specific topic] in the shared document. Could you check if this information is available in another section or document?"
 - For follow-up questions, re-examine the entire context carefully before concluding information is missing
 - Be thorough in your search through the context before determining something is not mentioned
-- Never make up or assume information not explicitly stated in the context`;
+- Never make up or assume information not explicitly stated in the context
+
+${FREE_TEXT_FORMAT_CONTRACT}`;
 
     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: "POST",
