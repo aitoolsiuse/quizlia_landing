@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useToast } from "@/components/app/ToastContainer";
 import { canGenerate, incrementUsage } from "@/lib/subscription";
 import { persistProfileContent } from "@/lib/notesSync";
+import { SHOW_APP_QR_EVENT, bumpGenerationCount, isOptedOut } from "@/lib/appPromo";
 import { auth } from "@/lib/firebase";
 import type { Profile, ContentItem } from "@/lib/types";
 
@@ -220,6 +221,13 @@ export function useGenerateContent({ profile, targetFolderId, onGenerated }: Use
 
       // Increment usage
       incrementUsage(profile.id);
+
+      // In-app App Store QR nudge: first generation and every 5th. The
+      // counter always counts; the card itself respects the opt-out.
+      const triggerCount = bumpGenerationCount(profile.id);
+      if (triggerCount !== null && !isOptedOut(profile.id)) {
+        window.dispatchEvent(new CustomEvent(SHOW_APP_QR_EVENT));
+      }
       const newUsage = canGenerate(profile.id);
       setRemainingGenerations(newUsage.remaining);
 
