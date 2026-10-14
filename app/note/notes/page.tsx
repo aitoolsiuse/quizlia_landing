@@ -112,7 +112,8 @@ function NotesExplorer() {
       }
       const profileData = JSON.parse(currentProfile);
       setProfile(profileData);
-      setFolders(JSON.parse(localStorage.getItem(`folders_${profileData.id}`) || "[]"));
+      // Folders follow the account: local cache first, then cloud merge.
+      syncProfileFolders(profileData).then(setFolders);
 
       // Load content and convert to topics
       const storedContent = localStorage.getItem(`content_${profileData.id}`);
