@@ -28,7 +28,7 @@ export function SiteFooter() {
               className="group flex items-center gap-3 pt-2"
             >
               <span className="rounded-lg border border-white/15 bg-white p-1.5">
-                <img src="/app-qr.svg" alt="QR code to download QuizliAI on the App Store" width={56} height={56} className="block h-14 w-14" />
+                <Image src="/app-qr.svg" alt="QR code to download QuizliAI on the App Store" width={56} height={56} unoptimized className="block h-14 w-14" />
               </span>
               <span className="text-xs font-rethink-sans text-white/50 group-hover:text-white transition-colors">
                 Get the iOS app
