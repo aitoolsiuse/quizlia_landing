@@ -7,7 +7,8 @@ import { canGenerate, incrementUsage } from "@/lib/subscription";
 import { persistProfileContent } from "@/lib/notesSync";
 import { SHOW_APP_QR_EVENT, bumpGenerationCount, isOptedOut } from "@/lib/appPromo";
 import { auth } from "@/lib/firebase";
-import type { Profile, ContentItem } from "@/lib/types";
+import type { Profile, ContentItem, Topic } from "@/lib/types";
+import { isAdminUser, publishNoteToLibrary } from "@/lib/publishNote";
 
 interface UseGenerateContentOptions {
   profile: Profile | null;
@@ -231,6 +232,37 @@ export function useGenerateContent({ profile, targetFolderId, onGenerated }: Use
 
       // Increment usage
       incrementUsage(profile.id);
+
+      // Super admins: generation goes straight to the public library.
+      // Failures never fail the generation itself.
+      const noteItem = newItems.find((i) => i.type === "notes");
+      if (noteItem && auth?.currentUser) {
+        try {
+          if (await isAdminUser()) {
+            const flashcardItem = newItems.find((i) => i.type === "flashcards");
+            const quizItem = newItems.find((i) => i.type === "quiz");
+            const publishedTopic: Topic = {
+              id: String(timestamp),
+              title: noteItem.title,
+              sourceType: contentType as Topic["sourceType"],
+              createdAt: new Date().toISOString(),
+              note: noteItem.data as Topic["note"],
+              flashcards: flashcardItem?.data?.flashcards ?? [],
+              quiz: quizItem?.data?.quizzes ?? [],
+            };
+            const { slug, url } = await publishNoteToLibrary(publishedTopic, auth.currentUser.uid);
+            localStorage.setItem(`publishedSlug_${profile.id}_${timestamp}`, slug);
+            try {
+              await navigator.clipboard.writeText(url);
+              showToast("Published to library — link copied", "success");
+            } catch {
+              showToast("Published to library", "success");
+            }
+          }
+        } catch {
+          showToast("Generated, but couldn't publish to the library", "error");
+        }
+      }
 
       // In-app App Store QR nudge: first generation and every 5th. The
       // counter always counts; the card itself respects the opt-out.
