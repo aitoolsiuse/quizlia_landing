@@ -8,6 +8,7 @@ import { FlashcardStudyMode } from "@/components/app/FlashcardStudyMode";
 import { QuizStudyMode } from "@/components/app/QuizStudyMode";
 import { getStudyGuide, StudyGuide } from "@/lib/studyGuide";
 import { Topic, getSourceIcon } from "@/lib/types";
+import { MarkdownText } from "@/components/app/MarkdownText";
 
 type TabType = "note" | "flashcards" | "quiz";
 
@@ -315,9 +316,10 @@ export default function PublicStudyGuidePage() {
                     <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
                       Quick Summary
                     </h3>
-                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-                      {topic.note.quick_summary}
-                    </p>
+                    <MarkdownText
+                      text={topic.note.quick_summary}
+                      className="text-gray-700 dark:text-gray-300 leading-relaxed"
+                    />
                   </div>
                 )}
 
@@ -343,9 +345,10 @@ export default function PublicStudyGuidePage() {
                       Detailed Notes
                     </h3>
                     <div className="prose dark:prose-invert max-w-none">
-                      <p className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-                        {topic.note.detailed_notes}
-                      </p>
+                      <MarkdownText
+                        text={topic.note.detailed_notes}
+                        className="text-gray-700 dark:text-gray-300 leading-relaxed"
+                      />
                     </div>
                   </div>
                 )}

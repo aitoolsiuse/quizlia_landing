@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Quiz } from "@/lib/studyGuide";
+import { MarkdownText } from "@/components/app/MarkdownText";
 
 interface InteractiveQuizProps {
   quizzes: Quiz[];
@@ -246,8 +247,11 @@ export function InteractiveQuiz({ quizzes }: InteractiveQuizProps) {
             <span>{showExplanation ? "Hide" : "Show"} Explanation</span>
           </button>
           {showExplanation && (
-            <div className="mt-3 bg-white/5 rounded-xl p-4 text-white/70 text-sm leading-relaxed font-rethink-sans">
-              {currentQuiz.explanation}
+            <div className="mt-3 bg-white/5 rounded-xl p-4">
+              <MarkdownText
+                text={currentQuiz.explanation}
+                className="text-white/70 text-sm leading-relaxed font-rethink-sans [&_strong]:text-white"
+              />
             </div>
           )}
         </div>

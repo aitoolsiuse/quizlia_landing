@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { FlashcardStudyMode } from "./FlashcardStudyMode";
 import { QuizStudyMode } from "./QuizStudyMode";
+import { MarkdownText } from "@/components/app/MarkdownText";
 
 interface ContentViewModalProps {
   isOpen: boolean;
@@ -289,7 +290,7 @@ export function ContentViewModal({ isOpen, onClose, content }: ContentViewModalP
                 {content.data.quick_summary && (
                   <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-6 border border-blue-200 dark:border-blue-900/30">
                     <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">Summary</h3>
-                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{content.data.quick_summary}</p>
+                    <MarkdownText text={content.data.quick_summary} className="text-gray-700 dark:text-gray-300 leading-relaxed" />
                   </div>
                 )}
 
@@ -382,9 +383,7 @@ export function ContentViewModal({ isOpen, onClose, content }: ContentViewModalP
                     {quiz.explanation && (
                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                         <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase">Explanation</span>
-                        <p className="text-gray-700 dark:text-gray-300 mt-1 text-sm">
-                          {quiz.explanation}
-                        </p>
+                        <MarkdownText text={quiz.explanation} className="text-gray-700 dark:text-gray-300 mt-1 text-sm" />
                       </div>
                     )}
                   </div>
@@ -429,7 +428,7 @@ export function ContentViewModal({ isOpen, onClose, content }: ContentViewModalP
 
                       {message.sender === "ai" && (
                         <div className="bg-white dark:bg-gray-800 rounded-xl rounded-bl-sm p-3 max-w-[85%] border border-gray-200 dark:border-gray-700">
-                          <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">{message.text}</p>
+                          <MarkdownText text={message.text} className="text-sm text-gray-900 dark:text-white" />
                         </div>
                       )}
 

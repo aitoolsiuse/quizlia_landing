@@ -702,9 +702,10 @@ export default function TopicDetailPage() {
                       Detailed Notes
                     </h3>
                     <div className="prose dark:prose-invert max-w-none">
-                      <p className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-                        {topic.note.detailed_notes}
-                      </p>
+                      <MarkdownText
+                        text={topic.note.detailed_notes}
+                        className="text-gray-700 dark:text-gray-300 leading-relaxed"
+                      />
                     </div>
                   </div>
                 )}

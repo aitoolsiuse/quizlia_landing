@@ -1,4 +1,5 @@
 import { Section } from "@/lib/studyGuide";
+import { MarkdownText } from "@/components/app/MarkdownText";
 
 interface CheatSheetSectionProps {
   sections: Section[];
@@ -25,9 +26,10 @@ export function CheatSheetSection({ sections }: CheatSheetSectionProps) {
               {section.title}
             </h3>
 
-            <div className="text-white/70 leading-relaxed font-rethink-sans whitespace-pre-line mb-4">
-              {highlightKeyTerms(section.content, section.keyTerms)}
-            </div>
+            <MarkdownText
+              text={section.content}
+              className="text-white/70 leading-relaxed font-rethink-sans mb-4 [&_strong]:text-white"
+            />
 
             {section.keyTerms && section.keyTerms.length > 0 && (
               <div className="pt-4 border-t border-white/10">
@@ -49,13 +51,4 @@ export function CheatSheetSection({ sections }: CheatSheetSectionProps) {
       </div>
     </div>
   );
-}
-
-// Helper to highlight key terms in content
-function highlightKeyTerms(content: string, keyTerms?: string[]): React.ReactNode {
-  if (!keyTerms || keyTerms.length === 0) return content;
-
-  let result = content;
-  // Terms are already shown below, so we just return content as-is
-  return content;
 }
