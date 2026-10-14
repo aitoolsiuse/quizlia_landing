@@ -51,6 +51,21 @@ export function HeroSection() {
             </Link>
           </div>
 
+          {/* App Store QR — scan or tap */}
+          <a
+            href="https://apps.apple.com/us/app/quizliai/id6751740981"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group mt-2 flex flex-col items-center gap-2"
+          >
+            <span className="rounded-2xl border border-white/15 bg-white p-2.5 transition-transform duration-300 ease-out group-hover:scale-[1.03]">
+              <img src="/app-qr.svg" alt="QR code to download QuizliAI on the App Store" width={96} height={96} className="block h-24 w-24" />
+            </span>
+            <span className="text-xs font-rethink-sans text-white/50 group-hover:text-white/80 transition-colors">
+              Scan to download on the App Store
+            </span>
+          </a>
+
           {/* Hero Image */}
           <div className="mt-[30px] w-full md:w-[100%] lg:w-full max-w-[1000px] mx-auto px-4">
               <Image 

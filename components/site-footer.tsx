@@ -21,6 +21,19 @@ export function SiteFooter() {
             <p className="text-sm text-white/50 font-rethink-sans">
               Your smart assistant for notes, transcripts, and AI-powered learning.
             </p>
+            <a
+              href="https://apps.apple.com/us/app/quizliai/id6751740981"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-3 pt-2"
+            >
+              <span className="rounded-lg border border-white/15 bg-white p-1.5">
+                <img src="/app-qr.svg" alt="QR code to download QuizliAI on the App Store" width={56} height={56} className="block h-14 w-14" />
+              </span>
+              <span className="text-xs font-rethink-sans text-white/50 group-hover:text-white transition-colors">
+                Get the iOS app
+              </span>
+            </a>
           </div>
 
           {/* Product Links */}
