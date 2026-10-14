@@ -438,6 +438,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 - Modify: `components/study-guide/CheatSheetSection.tsx` (~28 section content; delete ~54–61 helper)
 - Modify: `components/study-guide/InteractiveQuiz.tsx` (~249 explanation)
 - Modify: `app/note/[slug]/page.tsx` (~318 quick_summary, ~346 detailed_notes)
+- Modify: `app/note/topic/[id]/page.tsx` (~705 detailed_notes — surfaced during Task 3; same prose class as the `[slug]` one)
 
 **Interfaces:**
 - Consumes: `<MarkdownText text className />` from `@/components/app/MarkdownText` (Task 1).
@@ -597,6 +598,23 @@ to:
                         text={topic.note.detailed_notes}
                         className="text-gray-700 dark:text-gray-300 leading-relaxed"
                       />
+```
+
+Topic page detailed notes (~705, `app/note/topic/[id]/page.tsx` — inside the `{topic.note.detailed_notes && (` block) — change:
+
+```tsx
+                          <p className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+                            {topic.note.detailed_notes}
+                          </p>
+```
+
+to:
+
+```tsx
+                          <MarkdownText
+                            text={topic.note.detailed_notes}
+                            className="text-gray-700 dark:text-gray-300 leading-relaxed"
+                          />
 ```
 
 (Both are guarded by `&&` on the value in the existing JSX — keep those guards; MarkdownText's `text` prop is `string`, and the guards narrow it.)
