@@ -6,16 +6,59 @@ import Link from "next/link";
 import { useTheme } from "@/components/app/ThemeProvider";
 import { getSubscription, getPlanById, SUBSCRIPTION_PLANS, UserSubscription, canGenerate, resolveEffectivePlan } from "@/lib/subscription";
 import { PromoCodeInput } from "@/components/app/PromoCodeInput";
-import { deleteProfileFromFirebase } from "@/lib/firebaseProfiles";
+import { deleteProfileFromFirebase, saveProfileToFirebase } from "@/lib/firebaseProfiles";
+import { useToast } from "@/components/app/ToastContainer";
 import { useAuth } from "@/lib/auth";
 
 export default function SettingsPage() {
+  const { showToast } = useToast();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const { user, signOut, getUserEmail, getUserName, isConfigured } = useAuth();
   const [profile, setProfile] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"general" | "billing" | "notifications" | "account">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "billing" | "account">("general");
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
+
+  // Editable profile fields — initialized once the profile loads.
+  const [editName, setEditName] = useState("");
+  const [editType, setEditType] = useState("student");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setEditName(profile.name);
+      setEditType(profile.type || "student");
+    }
+  }, [profile?.id]);
+
+  const handleSaveProfile = async () => {
+    if (!profile || !editName.trim()) return;
+    setIsSavingProfile(true);
+    try {
+      const updated = { ...profile, name: editName.trim(), type: editType };
+
+      // Local list + current profile
+      const stored = localStorage.getItem("profiles");
+      const profiles = stored ? JSON.parse(stored) : [];
+      localStorage.setItem(
+        "profiles",
+        JSON.stringify(profiles.map((p: any) => (p.id === profile.id ? updated : p)))
+      );
+      localStorage.setItem("currentProfile", JSON.stringify(updated));
+
+      // Cloud mirror (best effort)
+      if (user?.email) {
+        await saveProfileToFirebase(user.email, updated);
+      }
+
+      setProfile(updated);
+      showToast("Profile updated", "success");
+    } catch {
+      showToast("Couldn't save profile", "error");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   const handleDeleteProfile = async () => {
     if (!profile) return;
@@ -109,17 +152,6 @@ export default function SettingsPage() {
                 <span className="font-medium">Billing</span>
               </button>
               <button
-                onClick={() => setActiveTab("notifications")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
-                  activeTab === "notifications"
-                    ? "bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                }`}
-              >
-                <span className="material-symbols-outlined">notifications</span>
-                <span className="font-medium">Notifications</span>
-              </button>
-              <button
                 onClick={() => setActiveTab("account")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
                   activeTab === "account"
@@ -164,25 +196,6 @@ export default function SettingsPage() {
                           </span>
                         </span>
                       </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Language */}
-                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-                  <div className="p-6 border-b border-gray-200 dark:border-gray-800">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Language & Region</h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Set your language preferences</p>
-                  </div>
-                  <div className="p-6 space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Language</label>
-                      <select className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option>English (US)</option>
-                        <option>Spanish</option>
-                        <option>French</option>
-                        <option>German</option>
-                      </select>
                     </div>
                   </div>
                 </div>
@@ -319,35 +332,6 @@ export default function SettingsPage() {
               </>
             )}
 
-            {/* Notifications Tab */}
-            {activeTab === "notifications" && (
-              <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-                <div className="p-6 border-b border-gray-200 dark:border-gray-800">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Notification Preferences</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Manage how you receive notifications</p>
-                </div>
-                <div className="p-6 space-y-4">
-                  {[
-                    { title: "Email Notifications", desc: "Receive updates via email" },
-                    { title: "Content Generation Complete", desc: "Notify when AI finishes processing" },
-                    { title: "Weekly Summary", desc: "Get a weekly report of your activity" },
-                    { title: "Tips & Tricks", desc: "Learn new ways to use QuizliAI" },
-                  ].map((item, index) => (
-                    <div key={index} className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-800 last:border-0">
-                      <div>
-                        <h3 className="font-medium text-gray-900 dark:text-white">{item.title}</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{item.desc}</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" className="sr-only peer" defaultChecked={index < 2} />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Account Tab */}
             {activeTab === "account" && (
               <>
@@ -376,30 +360,41 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                {/* Profile Information */}
+                {/* Profile Information — editable */}
                 <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
                   <div className="p-6 border-b border-gray-200 dark:border-gray-800">
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">Profile Information</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Changes sync to your other devices</p>
                   </div>
                   <div className="p-6 space-y-4">
                     <div>
                       <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Name</label>
                       <input
                         type="text"
-                        value={profile.name}
-                        readOnly
-                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Profile Type</label>
-                      <input
-                        type="text"
-                        value={profile.type}
-                        readOnly
-                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white capitalize"
-                      />
+                      <select
+                        value={editType}
+                        onChange={(e) => setEditType(e.target.value)}
+                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 capitalize"
+                      >
+                        <option value="student">Student</option>
+                        <option value="parent">Parent</option>
+                      </select>
                     </div>
+                    <button
+                      onClick={handleSaveProfile}
+                      disabled={isSavingProfile || (editName.trim() === profile.name && editType === profile.type)}
+                      className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-lg">save</span>
+                      {isSavingProfile ? "Saving..." : "Save Changes"}
+                    </button>
                   </div>
                 </div>
 
