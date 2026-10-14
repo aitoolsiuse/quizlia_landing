@@ -90,6 +90,34 @@ export async function getAllStudyGuides(): Promise<StudyGuide[]> {
   }
 }
 
+// Every note reachable at /note/<slug> — listed AND unlisted (SEO sitemap
+// scope; the listed flag gates only the browsable library, not access).
+export async function getAllNotesForSitemap(): Promise<
+  Array<{ slug: string; lastModified: string | null }>
+> {
+  if (!db) {
+    console.warn("Firebase not initialized");
+    return [];
+  }
+
+  try {
+    const notesRef = collection(db, "notes");
+    const querySnapshot = await getDocs(query(notesRef));
+    return querySnapshot.docs
+      .map((d) => {
+        const data = d.data() as StudyGuide;
+        return {
+          slug: data.slug || d.id,
+          lastModified: data.updatedAt ?? data.createdAt ?? null,
+        };
+      })
+      .filter((n) => n.slug);
+  } catch (error) {
+    console.error("Error fetching notes for sitemap:", error);
+    return [];
+  }
+}
+
 export async function getStudyGuidesByCategory(category: string): Promise<StudyGuide[]> {
   if (!db) {
     console.warn("Firebase not initialized");
