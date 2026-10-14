@@ -464,7 +464,7 @@ export default function PublicStudyGuidePage() {
 
                 {message.sender === "ai" && (
                   <div className="bg-gray-100 dark:bg-gray-800 rounded-xl rounded-bl-sm p-3 max-w-[85%]">
-                    <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">{message.text}</p>
+                    <MarkdownText text={message.text} className="text-sm text-gray-900 dark:text-white" />
                   </div>
                 )}
 
