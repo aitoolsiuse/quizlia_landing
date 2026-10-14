@@ -22,8 +22,9 @@ function guideToTopic(guide: StudyGuide): Topic {
     createdAt: guide.createdAt ?? "",
     note: {
       title: guide.title,
-      quick_summary: (guide.tldr || []).join("\n\n"),
-      key_findings: (guide.sections || []).flatMap((s) => s.keyTerms ?? []),
+      quick_summary: guide.quick_summary ?? (guide.tldr || []).join("\n\n"),
+      key_findings: guide.key_findings ?? [],
+      important_notes: guide.important_notes ?? [],
       sections: guide.sections ?? [],
     },
     flashcards: guide.flashcards ?? [],
@@ -92,8 +93,18 @@ export function GuideClient({ slug, initialGuide }: { slug: string; initialGuide
 
     let context = `Study Guide: ${guide.title}\n\n`;
 
-    if (guide.tldr && guide.tldr.length > 0) {
+    if (topic?.note?.quick_summary) {
+      context += `Summary:\n${topic.note.quick_summary}\n\n`;
+    } else if (guide.tldr && guide.tldr.length > 0) {
       context += `Summary:\n${guide.tldr.join("\n")}\n\n`;
+    }
+
+    if (topic?.note?.key_findings && topic.note.key_findings.length > 0) {
+      context += `Key Findings:\n${topic.note.key_findings.map((f: string) => `- ${f}`).join("\n")}\n\n`;
+    }
+
+    if (topic?.note?.important_notes && topic.note.important_notes.length > 0) {
+      context += `Important Notes:\n${topic.note.important_notes.map((n: string) => `- ${n}`).join("\n")}\n\n`;
     }
 
     if (guide.sections && guide.sections.length > 0) {
@@ -323,6 +334,38 @@ export function GuideClient({ slug, initialGuide }: { slug: string; initialGuide
                       text={topic.note.quick_summary}
                       className="text-gray-700 dark:text-gray-300 leading-relaxed"
                     />
+                  </div>
+                )}
+
+                {topic.note.key_findings && topic.note.key_findings.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
+                      Key Findings
+                    </h3>
+                    <ul className="space-y-2">
+                      {topic.note.key_findings.map((finding, index) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-blue-500 text-sm mt-1">check_circle</span>
+                          <span className="text-gray-700 dark:text-gray-300">{finding}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {topic.note.important_notes && topic.note.important_notes.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
+                      Important Notes
+                    </h3>
+                    <ul className="space-y-2">
+                      {topic.note.important_notes.map((item, index) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-yellow-500 text-sm mt-1">warning</span>
+                          <span className="text-gray-700 dark:text-gray-300">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
 
