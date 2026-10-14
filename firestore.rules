@@ -2,6 +2,17 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Server-anchored local date (YYYY-MM-DD) — quota docs must always
+    // carry exactly this, so clients can't jump the date forward.
+    function quizliaToday() {
+      let m = request.time.month();
+      let d = request.time.day();
+      return string(request.time.year()) + "-"
+        + (m < 10 ? "0" + string(m) : string(m)) + "-"
+        + (d < 10 ? "0" + string(d) : string(d));
+    }
+
+
     // Public study guides.
     // Readable by anyone (public study-guide pages + SSR REST fetch are
     // unauthenticated). Signed-in users may publish their own notes as
@@ -39,6 +50,44 @@ service cloud.firestore {
           allow read, write: if request.auth != null && request.auth.uid == userId;
         }
       }
+    }
+
+    // Generation quota — tamper-proof by rules, no service account:
+    // counters may only rise by at most 1 per write (or restart on a true
+    // rollover, anchored to SERVER time so nobody can jump the date),
+    // chatUsed likewise, freeUsed may only flip on, deletes never.
+    match /generationQuota/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      allow create: if request.auth != null && request.auth.uid == uid
+                    && request.resource.data.date == quizliaToday()
+                    && request.resource.data.used is int
+                    && request.resource.data.used >= 0
+                    && request.resource.data.used <= 1;
+
+      allow update: if request.auth != null && request.auth.uid == uid
+                    && request.resource.data.date == quizliaToday()
+                    && (
+                      // Same day: at most +1 on each counter, never a reset.
+                      (
+                        resource.data.get('date', '') == quizliaToday()
+                        && request.resource.data.used >= resource.data.get('used', 0)
+                        && request.resource.data.used <= resource.data.get('used', 0) + 1
+                        && request.resource.data.get('chatUsed', 0) >= resource.data.get('chatUsed', 0)
+                        && request.resource.data.get('chatUsed', 0) <= resource.data.get('chatUsed', 0) + 1
+                        && (!resource.data.get('freeUsed', false)
+                            || request.resource.data.get('freeUsed', false) == true)
+                      )
+                      // Genuine rollover: doc is from an earlier day.
+                      || (
+                        resource.data.get('date', '') < quizliaToday()
+                        && request.resource.data.used is int
+                        && request.resource.data.used >= 0
+                        && request.resource.data.used <= 1
+                      )
+                    );
+
+      allow delete: if false;
     }
 
     // Promo codes: readable by signed-in clients (redemption checks),

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
+import { resolveCaller } from "@/lib/token-verify";
 
 export const dynamic = "force-dynamic";
 
@@ -12,62 +11,16 @@ export const dynamic = "force-dynamic";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const UPLOAD_URL = "https://generativelanguage.googleapis.com/upload/v1beta/files";
 
-function adminInit() {
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!serviceAccount) return false;
-  if (!getApps().length) {
-    initializeApp({ credential: cert(JSON.parse(serviceAccount)) });
-  }
-  return true;
-}
-
-async function resolveUid(request: NextRequest): Promise<string | null> {
-  const auth = getAuth();
-
-  const bearer = request.headers.get("authorization") || "";
-  const idToken = bearer.startsWith("Bearer ") ? bearer.slice(7) : "";
-  if (idToken) {
-    try {
-      return (await auth.verifyIdToken(idToken)).uid;
-    } catch {
-      return null;
-    }
-  }
-
-  const refreshToken = request.headers.get("x-firebase-refresh");
-  if (!refreshToken) return null;
-
-  try {
-    const webApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    const response = await fetch(
-      `https://securetoken.googleapis.com/v1/token?key=${webApiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ grant_type: "refresh_token", refresh_token: refreshToken }),
-      }
-    );
-    const result = await response.json();
-    if (!result.id_token) return null;
-    return (await auth.verifyIdToken(result.id_token)).uid;
-  } catch {
-    return null;
-  }
-}
-
 export async function POST(request: NextRequest) {
   if (!GEMINI_API_KEY) {
     return NextResponse.json({ error: { code: 500, message: "Gemini key not configured" } }, { status: 500 });
   }
-  if (!adminInit()) {
-    return NextResponse.json(
-      { error: { code: 503, message: "Proxy not configured (FIREBASE_SERVICE_ACCOUNT missing)" } },
-      { status: 503 }
-    );
-  }
 
-  const uid = await resolveUid(request);
-  if (!uid) {
+  const caller = await resolveCaller(
+    request.headers.get("authorization") || "",
+    request.headers.get("x-firebase-refresh")
+  );
+  if (!caller) {
     return NextResponse.json({ error: { code: 401, message: "Not authenticated" } }, { status: 401 });
   }
 

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
-import { meterGeneration } from "@/lib/quota";
+import { meterGeneration, meterChat } from "@/lib/quota";
+import { resolveCaller, exchangeRefreshToken } from "@/lib/token-verify";
 
 export const dynamic = "force-dynamic";
 
@@ -13,99 +11,40 @@ export const dynamic = "force-dynamic";
 //                              paid (subscription mirror) = 15/day
 //   /api/ios/gemini/chat       — note chat + onboarding samples: 100/day
 // The model is chosen here, so it can change without an app release.
-// Requires FIREBASE_SERVICE_ACCOUNT (same env var as /api/generate).
+// No service account: the caller is verified via Google's public certs
+// (token-verify) and quotas are written under tamper-proof rules with
+// the caller's own token (lib/quota).
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent";
 
-function adminInit() {
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!serviceAccount) return false;
-  if (!getApps().length) {
-    initializeApp({ credential: cert(JSON.parse(serviceAccount)) });
-  }
-  return true;
-}
+async function checkQuota(purpose: string, token: string, uid: string): Promise<Response | null> {
+  // Shared budget with the web app (lib/quota): same doc, same units,
+  // same plan limits — one linked account, one budget. Chat/onboarding
+  // uses a separate generous bucket so it never eats generations.
+  const result = purpose === "generation"
+    ? await meterGeneration(token, uid)
+    : await meterChat(token, uid);
 
-async function resolveUid(request: NextRequest): Promise<string | null> {
-  const auth = getAuth();
-
-  const bearer = request.headers.get("authorization") || "";
-  const idToken = bearer.startsWith("Bearer ") ? bearer.slice(7) : "";
-  if (idToken) {
-    try {
-      return (await auth.verifyIdToken(idToken)).uid;
-    } catch {
-      return null;
-    }
-  }
-
-  // The iOS client sends its (synchronously available) refresh token;
-  // exchange it for an ID token and verify that.
-  const refreshToken = request.headers.get("x-firebase-refresh");
-  if (!refreshToken) return null;
-
-  try {
-    const webApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    const response = await fetch(
-      `https://securetoken.googleapis.com/v1/token?key=${webApiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ grant_type: "refresh_token", refresh_token: refreshToken }),
-      }
-    );
-    const result = await response.json();
-    if (!result.id_token) return null;
-    return (await auth.verifyIdToken(result.id_token)).uid;
-  } catch {
-    return null;
-  }
-}
-
-async function checkQuota(purpose: string, uid: string): Promise<Response | null> {
-  if (purpose === "generation") {
-    // Shared budget with the web app (lib/quota): same doc, same units,
-    // same plan limits — one linked account, one budget.
-    const result = await meterGeneration(uid);
-    if (result.ok) return null;
-    return NextResponse.json(
-      { error: { code: result.status, message: result.message } },
-      { status: result.status }
-    );
-  }
-
-  // chat / onboarding: a generous separate daily bucket so chat never
-  // eats the generation budget.
-  const db = getFirestore();
-  const today = new Date().toISOString().split("T")[0];
-  const quotaRef = db.collection("generationQuota").doc(uid);
-  const quotaSnap = await quotaRef.get();
-  const data = quotaSnap.data() as { date?: string; chatUsed?: number } | undefined;
-  const used = data?.date === today ? data.chatUsed ?? 0 : 0;
-  if (used >= 100) {
-    return NextResponse.json(
-      { error: { code: 429, message: "Daily limit reached. Try again tomorrow." } },
-      { status: 429 }
-    );
-  }
-  await quotaRef.set({ date: today, chatUsed: used + 1 }, { merge: true });
-  return null;
+  if (result.ok) return null;
+  return NextResponse.json(
+    { error: { code: result.status, message: result.message } },
+    { status: result.status }
+  );
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ purpose: string }> }) {
   if (!GEMINI_API_KEY) {
     return NextResponse.json({ error: { code: 500, message: "Gemini key not configured" } }, { status: 500 });
   }
-  if (!adminInit()) {
-    return NextResponse.json(
-      { error: { code: 503, message: "Proxy not configured (FIREBASE_SERVICE_ACCOUNT missing)" } },
-      { status: 503 }
-    );
-  }
 
-  const uid = await resolveUid(request);
-  if (!uid) {
+  // Bearer ID token, or the app's refresh token (exchanged server-side
+  // using only the public web API key).
+  const caller = await resolveCaller(
+    request.headers.get("authorization") || "",
+    request.headers.get("x-firebase-refresh")
+  );
+  if (!caller) {
     return NextResponse.json({ error: { code: 401, message: "Not authenticated" } }, { status: 401 });
   }
 
@@ -114,7 +53,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pu
     return NextResponse.json({ error: { code: 404, message: "Unknown purpose" } }, { status: 404 });
   }
 
-  const quotaError = await checkQuota(purpose, uid);
+  // The quota write needs the caller's own (verified) token.
+  const token = (request.headers.get("authorization") || "").startsWith("Bearer ")
+    ? (request.headers.get("authorization") || "").slice(7)
+    : await exchangeRefreshToken(request.headers.get("x-firebase-refresh") || "");
+
+  const quotaError = await checkQuota(purpose, token || "", caller.uid);
   if (quotaError) return quotaError;
 
   try {

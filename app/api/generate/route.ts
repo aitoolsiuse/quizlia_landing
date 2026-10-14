@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
 import { meterGeneration } from "@/lib/quota";
+import { resolveCaller } from "@/lib/token-verify";
 
 export const dynamic = 'force-dynamic';
 
@@ -110,26 +109,21 @@ function cleanJSONString(jsonString: string): string {
 }
 
 // Server-side quota enforcement — shared with the iOS proxy (lib/quota):
-// one linked account = one budget everywhere. Active only when
-// FIREBASE_SERVICE_ACCOUNT is configured; without it the route behaves as
-// before (local/dev mode).
+// one linked account = one budget everywhere. No service account: the
+// caller's token is verified against Google's public certs (token-verify)
+// and the counter is written under tamper-proof rules with that same token.
 async function checkQuota(request: NextRequest, setId?: string): Promise<Response | null> {
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!serviceAccount) return null;
-
-  const authHeader = request.headers.get("authorization") || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!token) {
+  const caller = await resolveCaller(
+    request.headers.get("authorization") || "",
+    null
+  );
+  if (!caller) {
     return NextResponse.json({ error: "Sign in to generate content" }, { status: 401 });
   }
 
   try {
-    if (!getApps().length) {
-      initializeApp({ credential: cert(JSON.parse(serviceAccount)) });
-    }
-
-    const decoded = await getAuth().verifyIdToken(token);
-    const result = await meterGeneration(decoded.uid, setId);
+    const token = (request.headers.get("authorization") || "").slice(7);
+    const result = await meterGeneration(token, caller.uid, setId);
     if (result.ok) return null;
 
     return NextResponse.json(
@@ -146,9 +140,8 @@ export async function POST(request: NextRequest) {
   try {
     const { type, content, fileData, mimeType, setId } = await request.json();
 
-    // Server-side quota gate (no-op unless FIREBASE_SERVICE_ACCOUNT is set).
-    // The web fires note+flashcard+quiz as one generation sharing a setId,
-    // so the trio is metered exactly once.
+    // Server-side quota gate. The web fires note+flashcard+quiz as one
+    // generation sharing a setId, so the trio is metered exactly once.
     const quotaError = await checkQuota(request, setId);
     if (quotaError) return quotaError;
 
