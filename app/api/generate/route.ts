@@ -14,12 +14,14 @@ const PROMPTS = {
 TASK:
 Analyze the provided content and return a structured summary in JSON format with the following keys:
 - title: string (concise title of the content)
+- quick_summary: string (a 5–8 sentence overall summary)
 - key_findings: array of strings (as many key facts or statistics as possible)
 - important_notes: array of strings (all relevant cautions, limitations, or extra details you can find)
-- quick_summary: string (a detailed 15–25 sentence overall summary)
+- sections: array of cheat-sheet sections — the detailed study material, organized topic by topic (3–8 sections, each with a short descriptive title, clear explanatory content, and up to 5 key terms)
 
 RULES:
 - Capture all meaningful information, no artificial limits on list sizes.
+- The sections are the main body of the notes: cover the whole source, one topic per section.
 - Keep language clear and concise.
 - No extra commentary or formatting outside of JSON.
 - If you cannot access or analyze the content, return: {"error": "content_not_accessible", "message": "Unable to access or analyze the provided content"}
@@ -27,9 +29,12 @@ RULES:
 RESPONSE FORMAT (JSON only):
 {
   "title": "string",
+  "quick_summary": "string",
   "key_findings": ["point 1", "point 2", "..."],
   "important_notes": ["point 1", "point 2", "..."],
-  "quick_summary": "string"
+  "sections": [
+    { "title": "section title", "content": "explanatory text", "keyTerms": ["term 1", "term 2"] }
+  ]
 }`,
 
   flashcard: `You are QuicNotes, an AI that generates study flashcards from the provided content.

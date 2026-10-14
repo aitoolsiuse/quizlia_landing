@@ -15,11 +15,20 @@ export interface Topic {
   quiz?: QuizQuestion[];
 }
 
+export interface NoteSection {
+  title: string;
+  content: string;
+  keyTerms?: string[];
+}
+
 export interface NoteData {
   title: string;
   quick_summary: string;
   key_findings: string[];
-  detailed_notes: string;
+  important_notes?: string[];
+  sections?: NoteSection[];
+  /** Legacy flat detail text — superseded by sections; kept for old notes. */
+  detailed_notes?: string;
 }
 
 export interface Flashcard {

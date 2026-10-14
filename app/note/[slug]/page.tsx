@@ -14,10 +14,6 @@ type TabType = "note" | "flashcards" | "quiz";
 // Public guides are seeded in the StudyGuide schema; the app renders notes
 // in the Topic shape — convert so both look identical.
 function guideToTopic(guide: StudyGuide): Topic {
-  const sectionsText = (guide.sections || [])
-    .map((s) => `## ${s.title}\n\n${s.content || ""}${s.keyTerms?.length ? `\n\nKey terms: ${s.keyTerms.join(", ")}` : ""}`)
-    .join("\n\n");
-
   return {
     id: guide.slug,
     title: guide.title,
@@ -28,7 +24,7 @@ function guideToTopic(guide: StudyGuide): Topic {
       title: guide.title,
       quick_summary: (guide.tldr || []).join("\n\n"),
       key_findings: (guide.sections || []).flatMap((s) => s.keyTerms ?? []),
-      detailed_notes: sectionsText,
+      sections: guide.sections ?? [],
     },
     flashcards: guide.flashcards ?? [],
     quiz: guide.quiz ?? [],
