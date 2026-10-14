@@ -34,11 +34,13 @@ function guideToTopic(guide: StudyGuide): Topic {
 export function GuideClient({ slug, initialGuide }: { slug: string; initialGuide: StudyGuide | null }) {
 
   const [profile, setProfile] = useState<any>(null);
-  const [topic, setTopic] = useState<Topic | null>(null);
-  // Seeded by the server wrapper (which fetched the guide for metadata);
-  // the fetch below stays as the fallback for null/error cases.
+  const [topic, setTopic] = useState<Topic | null>(initialGuide ? guideToTopic(initialGuide) : null);
+  // Seeded by the server wrapper (which fetched the guide for metadata) —
+  // initializing topic/loading from the seed puts the content in the SSR
+  // HTML instead of a loading flash. The fetch below stays as the fallback
+  // for null/error cases.
   const [guide, setGuide] = useState<StudyGuide | null>(initialGuide);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialGuide);
   const [activeTab, setActiveTab] = useState<TabType>("note");
   const [studyMode, setStudyMode] = useState<"flashcards" | "quiz" | null>(null);
 
@@ -56,10 +58,7 @@ export function GuideClient({ slug, initialGuide }: { slug: string; initialGuide
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (initialGuide) {
-      setTopic(guideToTopic(initialGuide));
-      setLoading(false);
-    } else {
+    if (!initialGuide) {
       async function loadGuide() {
         const data = await getStudyGuide(slug);
         setGuide(data);

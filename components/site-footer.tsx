@@ -1,5 +1,6 @@
 import Link from "next/link"
 import Image from "next/image"
+import { APP_STORE_URL } from "@/lib/constants"
 
 export function SiteFooter() {
   return (
@@ -22,7 +23,7 @@ export function SiteFooter() {
               Your smart assistant for notes, transcripts, and AI-powered learning.
             </p>
             <a
-              href="https://apps.apple.com/us/app/quizliai/id6751740981"
+              href={APP_STORE_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="group flex items-center gap-3 pt-2"

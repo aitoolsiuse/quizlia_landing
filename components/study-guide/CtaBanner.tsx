@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { APP_STORE_URL } from "@/lib/constants";
 
 interface CtaBannerProps {
   headline?: string;
@@ -47,7 +48,7 @@ export function CtaBanner({ headline, features }: CtaBannerProps) {
           </ul>
 
           <Link
-            href="https://apps.apple.com/us/app/quizliai/id6751740981"
+            href={APP_STORE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-3 px-8 py-4 bg-white text-black rounded-xl font-semibold hover:bg-white/90 transition-colors font-rethink-sans"

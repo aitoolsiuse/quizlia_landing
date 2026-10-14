@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { APP_STORE_URL } from "@/lib/constants"
 
 export function CTASection() {
   return (
@@ -15,7 +16,7 @@ export function CTASection() {
         {/* Download Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center relative z-10">
           <Link 
-            href="https://apps.apple.com/us/app/quizliai/id6751740981" 
+            href={APP_STORE_URL} 
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 bg-white text-black px-8 py-3 rounded-full hover:opacity-90 transition-all duration-300 ease-out hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(255,255,255,0.1)] font-rethink-sans"

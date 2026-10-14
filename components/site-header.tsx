@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
+import { APP_STORE_URL } from "@/lib/constants"
 
 export function SiteHeader() {
   return (
@@ -37,7 +38,7 @@ export function SiteHeader() {
 
         {/* Download Button */}
         <Link 
-          href="https://apps.apple.com/us/app/quizliai/id6751740981"
+          href={APP_STORE_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="px-6 py-2 bg-[#964CEE] hover:bg-[#964CEE]/90 text-white rounded-full text-sm font-medium transition-all duration-300 hover:scale-[1.02] font-rethink-sans"

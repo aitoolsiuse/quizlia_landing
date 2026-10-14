@@ -1,5 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
+import { APP_STORE_URL } from "@/lib/constants"
 
 export function HeroSection() {
   return (
@@ -20,7 +21,7 @@ export function HeroSection() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
             {/* Download Button */}
             <Link
-              href="https://apps.apple.com/us/app/quizliai/id6751740981"
+              href={APP_STORE_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="relative flex justify-center items-center w-[192px] h-[50px] px-[15px] py-[2px] gap-[10px] rounded-[200px] transition-all duration-300 ease-out hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(150,76,238,0.5)]"
@@ -53,7 +54,7 @@ export function HeroSection() {
 
           {/* App Store QR — scan or tap */}
           <a
-            href="https://apps.apple.com/us/app/quizliai/id6751740981"
+            href={APP_STORE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="group mt-2 flex flex-col items-center gap-2"

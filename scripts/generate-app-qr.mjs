@@ -3,6 +3,8 @@
 import QRCode from "qrcode";
 import { writeFile } from "fs/promises";
 
+// Keep in sync with APP_STORE_URL in lib/constants.ts (.mjs can't import
+// the TS constant) — if it changes, update both and regenerate.
 const URL = "https://apps.apple.com/us/app/quizliai/id6751740981";
 
 const svg = await QRCode.toString(URL, {
