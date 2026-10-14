@@ -22,6 +22,59 @@
   font-feature-settings: 'liga';
 }
 
+/* Buttons — these classes are referenced throughout the app but were never
+   defined; buttons relied on call-site utilities alone. inline-flex keeps
+   icon + label vertically centered. */
+.btn-primary,
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  font-weight: 500;
+  transition: all 150ms ease-out;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background-image: linear-gradient(to right, #964cee, #c77dff);
+  color: #ffffff;
+  padding: 0.625rem 1.5rem;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.btn-secondary {
+  border: 1px solid rgb(209 213 219); /* gray-300 */
+  background-color: #ffffff;
+  color: rgb(55 65 81); /* gray-700 */
+  padding: 0.625rem 1.5rem;
+}
+
+.btn-secondary:hover {
+  background-color: rgb(249 250 251); /* gray-50 */
+}
+
+.dark .btn-secondary {
+  border-color: rgb(55 65 81); /* gray-700 */
+  background-color: rgb(17 24 39); /* gray-900 */
+  color: rgb(209 213 219); /* gray-300 */
+}
+
+.dark .btn-secondary:hover {
+  background-color: rgb(31 41 55); /* gray-800 */
+}
+
 /* Font Variables */
 :root {
   --font-rethink-sans: 'Rethink Sans', system-ui, -apple-system, sans-serif;

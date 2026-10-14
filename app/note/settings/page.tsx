@@ -120,7 +120,7 @@ export default function SettingsPage() {
             <p className="text-gray-600 dark:text-gray-400">Manage your account and preferences</p>
           </div>
           <Link href="/note" className="btn-secondary">
-            <span className="material-symbols-outlined mr-2">arrow_back</span>
+            <span className="material-symbols-outlined text-base">arrow_back</span>
             Back to Dashboard
           </Link>
         </div>

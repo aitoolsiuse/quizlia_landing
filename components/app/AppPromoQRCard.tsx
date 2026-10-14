@@ -37,7 +37,7 @@ export function AppPromoQRCard() {
       <div className="relative w-44 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl p-4">
         <button
           onClick={() => setVisible(false)}
-          className="absolute top-2 right-2 p-1 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           aria-label="Hide for now"
           title="Hide for now"
         >

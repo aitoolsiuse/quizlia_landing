@@ -36,7 +36,7 @@ export function ItemActionsMenu({ onRename, onMove, showMove = true, onDelete, b
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className={`p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors ${buttonClassName}`}
+        className={`inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors ${buttonClassName}`}
         title="More actions"
       >
         <span className="material-symbols-outlined text-lg">more_vert</span>

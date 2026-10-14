@@ -37,7 +37,7 @@ export function TopicCard({ topic, onDelete, onRename, onMove }: TopicCardProps)
             e.stopPropagation();
             onDelete(topic.id);
           }}
-          className="bg-red-500 hover:bg-red-600 text-white rounded-full p-2 shadow-lg"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white shadow-lg"
           title="Delete topic"
         >
           <span className="material-symbols-outlined text-sm">delete</span>
