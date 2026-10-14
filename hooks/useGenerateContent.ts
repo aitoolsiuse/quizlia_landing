@@ -242,7 +242,7 @@ export function useGenerateContent({ profile, targetFolderId, onGenerated }: Use
             const flashcardItem = newItems.find((i) => i.type === "flashcards");
             const quizItem = newItems.find((i) => i.type === "quiz");
             const publishedTopic: Topic = {
-              id: String(timestamp),
+              id: sourceId,
               title: noteItem.title,
               sourceType: contentType as Topic["sourceType"],
               createdAt: new Date().toISOString(),
@@ -251,7 +251,7 @@ export function useGenerateContent({ profile, targetFolderId, onGenerated }: Use
               quiz: quizItem?.data?.quizzes ?? [],
             };
             const { slug, url } = await publishNoteToLibrary(publishedTopic, auth.currentUser.uid);
-            localStorage.setItem(`publishedSlug_${profile.id}_${timestamp}`, slug);
+            localStorage.setItem(`publishedSlug_${profile.id}_${sourceId}`, slug);
             try {
               await navigator.clipboard.writeText(url);
               showToast("Published to library — link copied", "success");
