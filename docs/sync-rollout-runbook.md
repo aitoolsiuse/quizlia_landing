@@ -28,34 +28,39 @@ Order matters: Firebase prep → web migration → promo codes → iOS build & t
 4. Quick rules sanity check (console simulator): a request to `users/{otherUid}` with
    auth as yourself must be rejected.
 
-## 2. Web user migration (email-keyed → uid-keyed)
+## 2. Web user migration (email-keyed → uid-keyed) — SKIPPED
 
-From `quizlia_landing` on this machine. Dry-run is the default; nothing writes
-until `--apply`; sources are only deleted by a later `--prune`.
+Decided 2026-10-14: there are no legacy users to migrate and the old
+`quicknotes-15593` project is retired entirely (nothing references it).
+The script below remains available if that ever changes:
 
 ```powershell
-# Option A: service account inline
-$env:FIREBASE_SERVICE_ACCOUNT = '{"project_id":"quailizy", ...full key json...}'
-# Option B: save the key as firebase-service-account.json in the repo root (gitignored? verify — do NOT commit it)
-
-node scripts/migrate-to-uid.mjs            # 1. dry-run: prints the copy plan + counts
-node scripts/migrate-to-uid.mjs --apply    # 2. write users/{emailDocId} -> users/{uid} (+ profiles subtree)
-# 3. verify in console: users/{uid} docs exist for a couple of known emails,
-#    and the web app still shows those users' notes
-node scripts/migrate-to-uid.mjs --prune    # 4. LATER, after burn-in: deletes migrated source docs
+# Needs firebase-service-account.json (quailizy) in the repo root — see §2a
+node scripts/migrate-to-uid.mjs            # dry-run: prints the copy plan + counts
+node scripts/migrate-to-uid.mjs --apply    # write users/{emailDocId} -> users/{uid}
+node scripts/migrate-to-uid.mjs --prune    # LATER, after burn-in: deletes source docs
 ```
 
-Re-runnable and idempotent — safe to run `--apply` twice. **Never commit the
-service-account key.**
+## 2a. Service account key (needed for the admin scripts)
 
-## 3. Promo codes: quicknotes-15593 → quailizy
+Firebase console → quailizy → Project settings → Service accounts →
+Generate new private key → save the download as
+`firebase-service-account.json` in the repo root (the filename is
+git-ignored — verified). Revoke the key in the same tab when done.
 
-1. Legacy console (quicknotes-15593) → Firestore → `promoCodes` → ⋮ → Export JSON.
-2. quailizy console → Firestore → import (or paste documents) into the same
-   collection name `promoCodes`. Same shape (`isActive`, `expirationDate`,
-   `usersUsed`) — no code changes needed.
-3. Redeem one test code in each app afterwards (matrix below).
-4. quicknotes-15593 stays read-only; retire after burn-in.
+## 3. Promo codes — created fresh in quailizy
+
+```powershell
+node scripts/create-promocodes.mjs LAUNCH100 FRIEND50            # explicit codes
+node scripts/create-promocodes.mjs --count 20 --prefix QUIZ      # random batch (QUIZXXXXXX)
+node scripts/create-promocodes.mjs LAUNCH100 --days 30 --dry-run # preview without writing
+```
+
+Docs land in `promoCodes/{CODE}` with the shape iOS validates
+(`expirationDate` Timestamp, `isActive: true`, `usersUsed: []`). Redeem a
+test code on iOS afterwards (matrix below). Known gap: the WEB promo field
+currently grants a free month for ANY text — validation there is a logged
+follow-up.
 
 ## 4. iOS build (Mac)
 
@@ -115,6 +120,9 @@ service-account key.**
   AI seed answers import to web (spec: `docs/superpowers/specs/2026-10-13-sync-completion-design.md`).
   Web→iOS chat is not built — iOS has no persistent chat history to receive it.
 
-Note: `docs/quailizy-firebase-setup.md` (iOS repo, branch `release/1.0.12`)
+- **Web promo-code validation** — `applyPromoCode` on web grants 1 free month
+  for any entered text; it should validate against the `promoCodes`
+  collection like iOS does (isActive / expirationDate / usersUsed).
+- Note: `docs/quailizy-firebase-setup.md` (iOS repo, branch `release/1.0.12`)
 predates the phase-2 commits — its "What is NOT in this phase" list is stale
 (cross-platform pull shipped); this runbook supersedes it for rollout steps.
