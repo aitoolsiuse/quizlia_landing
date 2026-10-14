@@ -326,19 +326,39 @@ export function GuideClient({ slug, initialGuide }: { slug: string; initialGuide
                   </div>
                 )}
 
-                {topic.note.key_findings && topic.note.key_findings.length > 0 && (
+                {topic.note.sections && topic.note.sections.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
-                      Key Findings
+                      Cheat Sheet
                     </h3>
-                    <ul className="space-y-2">
-                      {topic.note.key_findings.map((finding, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          <span className="material-symbols-outlined text-blue-500 text-sm mt-1">check_circle</span>
-                          <span className="text-gray-700 dark:text-gray-300">{finding}</span>
-                        </li>
+                    <div className="space-y-4">
+                      {topic.note.sections.map((section, index) => (
+                        <div
+                          key={index}
+                          className="bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4"
+                        >
+                          <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                            {section.title}
+                          </h4>
+                          <MarkdownText
+                            text={section.content}
+                            className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed"
+                          />
+                          {section.keyTerms && section.keyTerms.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              {section.keyTerms.map((term, tIndex) => (
+                                <span
+                                  key={tIndex}
+                                  className="text-xs px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"
+                                >
+                                  {term}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 )}
 
