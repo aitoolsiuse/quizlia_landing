@@ -9,7 +9,8 @@ import { QuizStudyMode } from "@/components/app/QuizStudyMode";
 import { Topic, getYouTubeThumbnail, getSourceIcon, getYouTubeEmbedUrl } from "@/lib/types";
 import { persistProfileContent, loadProfileContent } from "@/lib/notesSync";
 import { db, auth } from "@/lib/firebase";
-import { doc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, deleteDoc } from "firebase/firestore";
+import { isAdminUser, publishNoteToLibrary } from "@/lib/publishNote";
 import { Sidebar } from "@/components/app/Sidebar";
 import { RenameModal } from "@/components/app/RenameModal";
 import { MarkdownText } from "@/components/app/MarkdownText";
@@ -37,6 +38,14 @@ export default function TopicDetailPage() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!auth?.currentUser) return;
+    let cancelled = false;
+    isAdminUser().then((v) => { if (!cancelled) setIsAdmin(v); });
+    return () => { cancelled = true; };
+  }, [auth?.currentUser?.uid]);
 
   // Chat state
   const [messages, setMessages] = useState<Array<{
@@ -207,66 +216,20 @@ export default function TopicDetailPage() {
   }, [publishedKey]);
 
   const handlePublish = async () => {
-    if (!topic || isPublishing || !db || !auth?.currentUser) {
+    if (!topic || isPublishing || !auth?.currentUser) {
       if (!auth?.currentUser) showToast("Sign in to publish a note", "error");
       return;
     }
     setIsPublishing(true);
     try {
-      const slugify = (text: string) =>
-        text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "note";
-      const slug = `${slugify(topic.title)}-${Date.now().toString(36)}`;
-      const now = new Date().toISOString();
-
-      // Same shape as seeded guides so the public page renders it
-      // identically. Rules enforce ownerUid + listed:false on client writes.
-      await setDoc(doc(db, "notes", slug), {
-        slug,
-        title: topic.title,
-        category: "community",
-        difficulty: "medium",
-        sourceChannel: "QuizliAI user",
-        youtubeId: "",
-        createdAt: now,
-        updatedAt: now,
-        tldr:
-          topic.note?.key_findings && topic.note.key_findings.length > 0
-            ? topic.note.key_findings.slice(0, 5)
-            : [topic.note?.quick_summary].filter(Boolean),
-        // Carry the real note fields so the public guide shows exactly what
-        // the topic page shows (old docs without these keep the fallbacks).
-        quick_summary: topic.note?.quick_summary ?? "",
-        key_findings: topic.note?.key_findings ?? [],
-        important_notes: topic.note?.important_notes ?? [],
-        sections: topic.note?.sections && topic.note.sections.length > 0
-          ? topic.note.sections
-          : [
-              ...(topic.note?.quick_summary
-                ? [{ title: "Summary", content: topic.note.quick_summary, keyTerms: [] }]
-                : []),
-              ...(topic.note?.detailed_notes
-                ? [{
-                    title: "Detailed Notes",
-                    content: topic.note.detailed_notes,
-                    keyTerms: topic.note?.key_findings ?? [],
-                  }]
-                : []),
-            ],
-        quiz: topic.quiz ?? [],
-        flashcards: topic.flashcards ?? [],
-        listed: false,
-        ownerUid: auth.currentUser.uid,
-        publishedAt: now,
-      });
-
+      const { slug, url } = await publishNoteToLibrary(topic, auth.currentUser.uid);
       localStorage.setItem(publishedKey, slug);
       setPublishedSlug(slug);
-      const url = `${window.location.origin}/note/${slug}`;
       try {
         await navigator.clipboard.writeText(url);
-        showToast("Published — link copied to clipboard", "success");
+        showToast("Published to library — link copied", "success");
       } catch {
-        showToast("Published", "success");
+        showToast("Published to library", "success");
       }
     } catch {
       showToast("Couldn't publish this note", "error");
@@ -521,7 +484,7 @@ export default function TopicDetailPage() {
                     </p>
                   </div>
                 </div>
-                {publishedSlug ? (
+                {isAdmin && (publishedSlug ? (
                   <>
                     <button
                       onClick={copyPublishedLink}
@@ -543,11 +506,11 @@ export default function TopicDetailPage() {
                     onClick={handlePublish}
                     disabled={isPublishing}
                     className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg transition-colors disabled:opacity-50"
-                    title="Make note public (unlisted link)"
+                    title="Publish to the public library"
                   >
                     <span className="material-symbols-outlined">public</span>
                   </button>
-                )}
+                ))}
                 <button
                   onClick={handleShareTopic}
                   className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg transition-colors"
