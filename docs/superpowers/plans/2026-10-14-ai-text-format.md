@@ -209,8 +209,8 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `app/api/chat/route.ts` (fullPrompt, ~lines 23–39)
-- Modify: `app/api/generate/route.ts` (both parts.push branches, ~lines 207–234)
-- Modify: `app/api/ios/gemini/[purpose]/route.ts` (upstream fetch body, ~lines 137–151)
+- Modify: `app/api/generate/route.ts` (both parts.push branches, ~lines 189–194; anchors verified against `64efdf4`)
+- Modify: `app/api/ios/gemini/[purpose]/route.ts` (upstream fetch body, ~lines 121–132; anchors verified against `64efdf4`)
 
 **Interfaces:**
 - Consumes: `FREE_TEXT_FORMAT_CONTRACT`, `JSON_FORMAT_CONTRACT` from `@/lib/format-contract` (Task 1).
