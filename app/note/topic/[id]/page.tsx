@@ -39,13 +39,14 @@ export default function TopicDetailPage() {
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const adminUid = auth?.currentUser?.uid;
 
   useEffect(() => {
-    if (!auth?.currentUser) return;
+    if (!adminUid) return;
     let cancelled = false;
     isAdminUser().then((v) => { if (!cancelled) setIsAdmin(v); });
     return () => { cancelled = true; };
-  }, [auth?.currentUser?.uid]);
+  }, [adminUid]);
 
   // Chat state
   const [messages, setMessages] = useState<Array<{
@@ -205,8 +206,9 @@ export default function TopicDetailPage() {
     }
   };
 
-  // Publish / unpublish as an unlisted public guide (shareable link,
-  // hidden from the browsable library).
+  // Publish straight into the public library (super admins only — the
+  // button renders just for admins; Firestore rules enforce the write).
+  // Unpublish removes the guide; owners of legacy guides keep that too.
   const publishedKey = profile ? `publishedSlug_${profile.id}_${topicId}` : "";
 
   useEffect(() => {
