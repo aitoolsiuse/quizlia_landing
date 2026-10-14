@@ -34,7 +34,8 @@ service cloud.firestore {
       allow create: if isAdmin()
                     && request.resource.data.ownerUid == request.auth.uid;
       allow update: if isAdmin()
-                    && resource.data.ownerUid == request.auth.uid;
+                    && resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.ownerUid == request.auth.uid;
       allow delete: if request.auth != null
                     && resource.data.ownerUid == request.auth.uid;
     }
@@ -46,11 +47,12 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
 
       // Owner-writable EXCEPT the admin flag: the post-write value of
-      // `admin` (carried over when the write omits the field) must equal
-      // the pre-write value, so nobody can self-promote. The console /
-      // Admin SDK bypass rules to set it.
+      // `admin` (absent = false) must equal the pre-write value. Merge
+      // writes that omit the field keep the doc's value via the merged
+      // post-state; a full replace that drops it is DENIED (no silent
+      // de-admining). The console / Admin SDK bypass rules to set it.
       allow create, update: if request.auth != null && request.auth.uid == userId
-                    && request.resource.data.get('admin', resource.data.get('admin', false))
+                    && request.resource.data.get('admin', false)
                        == resource.data.get('admin', false);
 
       allow delete: if request.auth != null && request.auth.uid == userId;

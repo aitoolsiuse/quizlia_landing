@@ -486,7 +486,7 @@ export default function TopicDetailPage() {
                     </p>
                   </div>
                 </div>
-                {isAdmin && (publishedSlug ? (
+                {publishedSlug ? (
                   <>
                     <button
                       onClick={copyPublishedLink}
@@ -503,7 +503,7 @@ export default function TopicDetailPage() {
                       <span className="material-symbols-outlined">visibility_off</span>
                     </button>
                   </>
-                ) : (
+                ) : isAdmin ? (
                   <button
                     onClick={handlePublish}
                     disabled={isPublishing}
@@ -512,7 +512,7 @@ export default function TopicDetailPage() {
                   >
                     <span className="material-symbols-outlined">public</span>
                   </button>
-                ))}
+                ) : null}
                 <button
                   onClick={handleShareTopic}
                   className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg transition-colors"
