@@ -5,6 +5,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  arrayUnion,
   serverTimestamp,
   Timestamp,
 } from "firebase/firestore";
@@ -200,7 +201,9 @@ export async function updateFirebaseSubscription(
 }
 
 
-// Apply promo code (matches iOS applyPromoCode)
+// Apply promo code — validates against the promoCodes collection exactly
+// like the iOS app (isActive, expirationDate, one redemption per user in
+// usersUsed) before granting the free month.
 export async function applyPromoCode(
   email: string,
   code: string
@@ -210,6 +213,26 @@ export async function applyPromoCode(
   }
 
   try {
+    // Validate the code document first (mirrors QuizliAiPromoManager).
+    const codeRef = doc(db, "promoCodes", code);
+    const codeSnap = await getDoc(codeRef);
+    if (!codeSnap.exists()) {
+      return { success: false, message: "Invalid promo code." };
+    }
+    const data = codeSnap.data();
+    if (data.isActive !== true) {
+      return { success: false, message: "This promo code is no longer active." };
+    }
+    const expiration = data.expirationDate instanceof Timestamp ? data.expirationDate.toDate() : null;
+    if (!expiration || expiration < new Date()) {
+      return { success: false, message: "This promo code has expired." };
+    }
+    const userId = auth?.currentUser?.uid || currentUserDocId(email);
+    const usersUsed = Array.isArray(data.usersUsed) ? data.usersUsed : [];
+    if (usersUsed.includes(userId)) {
+      return { success: false, message: "You have already used this promo code." };
+    }
+
     const docId = currentUserDocId(email);
     const userRef = doc(db, "users", docId);
 
@@ -224,6 +247,10 @@ export async function applyPromoCode(
       freePlanActive: true,
       freePlanExpiresAt: expiryDate,
     });
+
+    // Mark the code used by this user (atomic append — no double redemption
+    // across tabs or platforms sharing the uid).
+    await updateDoc(codeRef, { usersUsed: arrayUnion(userId) });
 
     console.log("✅ Promo code applied successfully");
     return { success: true, message: "Promo code applied! You have 1 month of Pro access." };
