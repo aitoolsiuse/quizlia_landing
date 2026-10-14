@@ -10,6 +10,7 @@
 //
 // Budgets (identical for web + iOS, from the shared subscription mirror):
 //   free → 1 generation, lifetime · individual/weekly → 5/day · family (+legacy) → 15/day
+//   super admin (users/{uid}.admin) → unlimited, unmetered
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "";
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
@@ -80,14 +81,17 @@ async function restPatch(
   return response.ok;
 }
 
-async function readPlan(token: string, uid: string): Promise<PlanKind> {
+async function readUser(token: string, uid: string): Promise<{ plan: PlanKind; admin: boolean }> {
   const user = await restGet(`users/${uid}`, token);
   const subs: any = user?.fields?.subscriptions?.mapValue?.fields ?? {};
   const parsed: Subs = {};
   for (const [key, value] of Object.entries(subs)) {
     parsed[key] = { active: (value as any)?.mapValue?.fields?.active?.booleanValue === true };
   }
-  return planFromSubscriptions(parsed);
+  return {
+    plan: planFromSubscriptions(parsed),
+    admin: user?.fields?.admin?.booleanValue === true,
+  };
 }
 
 async function getQuota(token: string, uid: string): Promise<QuotaDoc | null> {
@@ -107,7 +111,11 @@ export async function meterGeneration(
   uid: string,
   setId?: string
 ): Promise<QuotaResult> {
-  const plan = await readPlan(token, uid);
+  const { plan, admin } = await readUser(token, uid);
+
+  // Super admins generate without limits (and without metering).
+  if (admin) return { ok: true };
+
   const quota = (await getQuota(token, uid)) ?? {};
   const isToday = quota.date === today();
 
@@ -145,6 +153,11 @@ export async function meterGeneration(
 
 /** Chat/onboarding bucket: generous daily cap, separate from generations. */
 export async function meterChat(token: string, uid: string): Promise<QuotaResult> {
+  const { admin } = await readUser(token, uid);
+
+  // Super admins chat without limits.
+  if (admin) return { ok: true };
+
   const quota = (await getQuota(token, uid)) ?? {};
   const isToday = quota.date === today();
   const used = isToday ? quota.chatUsed ?? 0 : 0;
