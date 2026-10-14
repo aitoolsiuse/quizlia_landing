@@ -164,7 +164,7 @@ export function MarkdownText({ text, className }: MarkdownTextProps) {
         }
         return (
           <p key={blockIndex} className="my-2 first:mt-0 last:mb-0">
-            {block.lines.map((line, lineIndex) => (
+            {block.kind === "paragraph" && block.lines.map((line, lineIndex) => (
               <span key={lineIndex}>
                 {lineIndex > 0 && <br />}
                 {renderInline(line)}
