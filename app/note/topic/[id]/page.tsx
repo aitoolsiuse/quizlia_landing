@@ -8,6 +8,7 @@ import { FlashcardStudyMode } from "@/components/app/FlashcardStudyMode";
 import { QuizStudyMode } from "@/components/app/QuizStudyMode";
 import { Topic, getYouTubeThumbnail, getSourceIcon, getYouTubeEmbedUrl } from "@/lib/types";
 import { persistProfileContent, loadProfileContent } from "@/lib/notesSync";
+import { auth } from "@/lib/firebase";
 import { Sidebar } from "@/components/app/Sidebar";
 import { RenameModal } from "@/components/app/RenameModal";
 
@@ -32,6 +33,8 @@ export default function TopicDetailPage() {
   const [activeTab, setActiveTab] = useState<TabType>("note");
   const [studyMode, setStudyMode] = useState<"flashcards" | "quiz" | null>(null);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // Chat state
   const [messages, setMessages] = useState<Array<{
@@ -188,6 +191,94 @@ export default function TopicDetailPage() {
       showToast("Copied to clipboard", "success");
     } catch {
       showToast("Couldn't share this topic", "error");
+    }
+  };
+
+  // Publish / unpublish as an unlisted public guide (shareable link,
+  // hidden from the browsable library).
+  const publishedKey = profile ? `publishedSlug_${profile.id}_${topicId}` : "";
+
+  useEffect(() => {
+    if (publishedKey && typeof window !== "undefined") {
+      setPublishedSlug(localStorage.getItem(publishedKey));
+    }
+  }, [publishedKey]);
+
+  const handlePublish = async () => {
+    if (!topic || isPublishing) return;
+    setIsPublishing(true);
+    try {
+      const token = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+      const response = await fetch("/api/publish", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify({
+          title: topic.title,
+          note: topic.note,
+          flashcards: topic.flashcards,
+          quiz: topic.quiz,
+        }),
+      });
+      const result = await response.json();
+      if (result.slug) {
+        localStorage.setItem(publishedKey, result.slug);
+        setPublishedSlug(result.slug);
+        const url = `${window.location.origin}/note/${result.slug}`;
+        try {
+          await navigator.clipboard.writeText(url);
+          showToast("Published — link copied to clipboard", "success");
+        } catch {
+          showToast("Published", "success");
+        }
+      } else {
+        showToast(result.error || "Couldn't publish this note", "error");
+      }
+    } catch {
+      showToast("Couldn't publish this note", "error");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleUnpublish = async () => {
+    if (!publishedSlug || isPublishing) return;
+    setIsPublishing(true);
+    try {
+      const token = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+      const response = await fetch("/api/publish", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify({ slug: publishedSlug }),
+      });
+      const result = await response.json();
+      if (result.ok) {
+        localStorage.removeItem(publishedKey);
+        setPublishedSlug(null);
+        showToast("Note unpublished", "success");
+      } else {
+        showToast(result.error || "Couldn't unpublish", "error");
+      }
+    } catch {
+      showToast("Couldn't unpublish", "error");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const copyPublishedLink = async () => {
+    if (!publishedSlug) return;
+    const url = `${window.location.origin}/note/${publishedSlug}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast("Link copied to clipboard", "success");
+    } catch {
+      showToast(url, "info");
     }
   };
 
@@ -398,6 +489,33 @@ export default function TopicDetailPage() {
                     </p>
                   </div>
                 </div>
+                {publishedSlug ? (
+                  <>
+                    <button
+                      onClick={copyPublishedLink}
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-green-600 rounded-lg transition-colors"
+                      title="Copy public link"
+                    >
+                      <span className="material-symbols-outlined">link</span>
+                    </button>
+                    <button
+                      onClick={handleUnpublish}
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg transition-colors"
+                      title="Unpublish"
+                    >
+                      <span className="material-symbols-outlined">visibility_off</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={handlePublish}
+                    disabled={isPublishing}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg transition-colors disabled:opacity-50"
+                    title="Make note public (unlisted link)"
+                  >
+                    <span className="material-symbols-outlined">public</span>
+                  </button>
+                )}
                 <button
                   onClick={handleShareTopic}
                   className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg transition-colors"

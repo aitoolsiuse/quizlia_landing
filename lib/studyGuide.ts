@@ -75,7 +75,12 @@ export async function getAllStudyGuides(): Promise<StudyGuide[]> {
 
     const guides: StudyGuide[] = [];
     querySnapshot.forEach((doc) => {
-      guides.push(doc.data() as StudyGuide);
+      const data = doc.data() as StudyGuide & { listed?: boolean };
+      // Unlisted docs are user-published notes shared by direct link —
+      // they stay out of the browsable library unless an admin flips
+      // listed to true. Seeded guides have no `listed` field → shown.
+      if (data.listed === false) return;
+      guides.push(data);
     });
 
     return guides;
