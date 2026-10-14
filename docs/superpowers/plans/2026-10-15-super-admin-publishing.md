@@ -477,7 +477,7 @@ After the `incrementUsage(profile.id);` line (223) and BEFORE the App Store QR c
             const flashcardItem = newItems.find((i) => i.type === "flashcards");
             const quizItem = newItems.find((i) => i.type === "quiz");
             const publishedTopic: Topic = {
-              id: String(timestamp),
+              id: sourceId,
               title: noteItem.title,
               sourceType: contentType as Topic["sourceType"],
               createdAt: new Date().toISOString(),
@@ -486,7 +486,7 @@ After the `incrementUsage(profile.id);` line (223) and BEFORE the App Store QR c
               quiz: quizItem?.data?.quizzes ?? [],
             };
             const { slug, url } = await publishNoteToLibrary(publishedTopic, auth.currentUser.uid);
-            localStorage.setItem(`publishedSlug_${profile.id}_${timestamp}`, slug);
+            localStorage.setItem(`publishedSlug_${profile.id}_${sourceId}`, slug);
             try {
               await navigator.clipboard.writeText(url);
               showToast("Published to library — link copied", "success");
@@ -500,7 +500,7 @@ After the `incrementUsage(profile.id);` line (223) and BEFORE the App Store QR c
       }
 ```
 
-(The `publishedSlug_${profile.id}_${timestamp}` key matches the topic page's `publishedSlug_${profile.id}_${topicId}` — the topic page's topicId is this same item id — so the page shows the published state instead of a duplicate-publish button.)
+(Use `sourceId` — NOT `timestamp` — in the key: the topic page's `topicId` is the item's `sourceId` (`source_${timestamp}`) via `migrateContentToTopics` (`topic.id = item.sourceId || legacy_${item.id}`), so `publishedSlug_${profile.id}_${sourceId}` is what its `publishedKey` reads. The Topic's `id` field is likewise `sourceId`.)
 
 - [ ] **Step 3: Verify types + lint**
 
