@@ -233,6 +233,11 @@ export default function TopicDetailPage() {
           topic.note?.key_findings && topic.note.key_findings.length > 0
             ? topic.note.key_findings.slice(0, 5)
             : [topic.note?.quick_summary].filter(Boolean),
+        // Carry the real note fields so the public guide shows exactly what
+        // the topic page shows (old docs without these keep the fallbacks).
+        quick_summary: topic.note?.quick_summary ?? "",
+        key_findings: topic.note?.key_findings ?? [],
+        important_notes: topic.note?.important_notes ?? [],
         sections: topic.note?.sections && topic.note.sections.length > 0
           ? topic.note.sections
           : [

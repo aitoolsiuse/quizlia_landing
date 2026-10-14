@@ -35,6 +35,11 @@ export interface StudyGuide {
   createdAt?: string;
   updatedAt?: string;
   tldr: string[];
+  // Real note fields carried by user-published notes. Seeded guides only
+  // have tldr/sections — these stay undefined there and the UI falls back.
+  quick_summary?: string;
+  key_findings?: string[];
+  important_notes?: string[];
   sections: Section[];
   quiz: Quiz[];
   flashcards?: Flashcard[];
