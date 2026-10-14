@@ -95,6 +95,11 @@ export function useGenerateContent({ profile, targetFolderId, onGenerated }: Use
         ...(fileData && { fileData })
       };
 
+      // One generation fans out to three requests (note/flashcards/quiz);
+      // the shared setId makes the server meter it as a single generation
+      // against the account's cross-platform budget.
+      const setId = `gen_${Date.now().toString(36)}`;
+
       // Generate all three types in parallel. Attach the Firebase ID token
       // so the server can enforce per-account quotas (see /api/generate).
       const authToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
@@ -105,17 +110,17 @@ export function useGenerateContent({ profile, targetFolderId, onGenerated }: Use
         fetch("/api/generate", {
           method: "POST",
           headers: requestHeaders,
-          body: JSON.stringify({ ...requestBody, type: "note" }),
+          body: JSON.stringify({ ...requestBody, type: "note", setId }),
         }),
         fetch("/api/generate", {
           method: "POST",
           headers: requestHeaders,
-          body: JSON.stringify({ ...requestBody, type: "flashcard" }),
+          body: JSON.stringify({ ...requestBody, type: "flashcard", setId }),
         }),
         fetch("/api/generate", {
           method: "POST",
           headers: requestHeaders,
-          body: JSON.stringify({ ...requestBody, type: "quiz" }),
+          body: JSON.stringify({ ...requestBody, type: "quiz", setId }),
         }),
       ]);
 

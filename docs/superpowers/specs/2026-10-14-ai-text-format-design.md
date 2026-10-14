@@ -117,8 +117,9 @@ Plug-in points (replace plain-text renders):
 - `components/app/ContentViewModal.tsx`: chat bubble (~432), quick_summary
   (~292), quiz explanation (~385).
 - `app/note/[slug]/page.tsx`: `quick_summary` render (~319; built from
-  `guide.tldr`). Section content renders via `CheatSheetSection` — covered
-  below. No quiz on the public guide page.
+  `guide.tldr`) and `detailed_notes` (~346) — same prose class. Section
+  content renders via `CheatSheetSection` — covered below. No quiz on the
+  public guide page.
 - `components/study-guide/CheatSheetSection.tsx`: section content (replacing
   the `highlightKeyTerms` pass-through).
 - `components/study-guide/InteractiveQuiz.tsx`: explanation (~250).

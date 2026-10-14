@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { meterGeneration } from "@/lib/quota";
 
 export const dynamic = "force-dynamic";
 
@@ -63,43 +64,24 @@ async function resolveUid(request: NextRequest): Promise<string | null> {
 }
 
 async function checkQuota(purpose: string, uid: string): Promise<Response | null> {
-  const db = getFirestore();
-  const today = new Date().toISOString().split("T")[0];
-  const quotaRef = db.collection("generationQuota").doc(uid);
-  const quotaSnap = await quotaRef.get();
-  const data = quotaSnap.data() as { date?: string; used?: number; chatUsed?: number; freeUsed?: boolean } | undefined;
-
   if (purpose === "generation") {
-    // Plan from the subscription mirror (written by the app on purchase;
-    // any active plan = family-equivalent daily budget on iOS).
-    const userSnap = await db.collection("users").doc(uid).get();
-    const subs = (userSnap.data()?.subscriptions ?? {}) as Record<string, { active?: boolean }>;
-    const hasActive = Object.values(subs).some((s) => s?.active);
-
-    if (!hasActive) {
-      if (data?.freeUsed) {
-        return NextResponse.json(
-          { error: { code: 429, message: "Free note already used. Upgrade to keep generating." } },
-          { status: 429 }
-        );
-      }
-      await quotaRef.set({ date: today, used: (data?.date === today ? data.used ?? 0 : 0) + 1, freeUsed: true }, { merge: true });
-      return null;
-    }
-
-    const used = data?.date === today ? data.used ?? 0 : 0;
-    if (used >= 15) {
-      return NextResponse.json(
-        { error: { code: 429, message: "Daily generation limit reached (15 per day)." } },
-        { status: 429 }
-      );
-    }
-    await quotaRef.set({ date: today, used: used + 1 }, { merge: true });
-    return null;
+    // Shared budget with the web app (lib/quota): same doc, same units,
+    // same plan limits — one linked account, one budget.
+    const result = await meterGeneration(uid);
+    if (result.ok) return null;
+    return NextResponse.json(
+      { error: { code: result.status, message: result.message } },
+      { status: result.status }
+    );
   }
 
   // chat / onboarding: a generous separate daily bucket so chat never
   // eats the generation budget.
+  const db = getFirestore();
+  const today = new Date().toISOString().split("T")[0];
+  const quotaRef = db.collection("generationQuota").doc(uid);
+  const quotaSnap = await quotaRef.get();
+  const data = quotaSnap.data() as { date?: string; chatUsed?: number } | undefined;
   const used = data?.date === today ? data.chatUsed ?? 0 : 0;
   if (used >= 100) {
     return NextResponse.json(
