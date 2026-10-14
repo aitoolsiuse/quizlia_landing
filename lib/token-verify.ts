@@ -1,33 +1,41 @@
 // Credential-less Firebase ID-token verification.
 //
 // Verifies the JWT the same way firebase-admin does internally — signature
-// against Google's rotating public certificates, plus issuer/audience/
-// expiry checks against this project — without any service account. Used
-// by the API routes (web generate + iOS proxy) so no server secret is
-// required anywhere: the caller proves who they are, the rules prove what
-// may be written.
-import crypto from "crypto";
-
+// against Google's rotating public keys (JWK form, verified with WebCrypto
+// so this runs in ANY server runtime), plus issuer/audience/expiry checks
+// against this project. No service account, no Node-only APIs.
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "";
-const CERT_URL =
-  "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com";
+const JWK_URL =
+  "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
 
-let certsCache: { keys: Record<string, string>; fetchedAt: number } | null = null;
-
-function b64urlToBuffer(input: string): Buffer {
-  return Buffer.from(input.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+interface Jwk {
+  kid: string;
+  kty: string;
+  n: string;
+  e: string;
 }
 
-async function getCerts(): Promise<Record<string, string>> {
+let jwkCache: { keys: Jwk[]; fetchedAt: number } | null = null;
+
+function b64urlToBuffer(input: string): Uint8Array {
+  const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function getJwks(): Promise<Jwk[]> {
   const now = Date.now();
-  if (certsCache && now - certsCache.fetchedAt < 24 * 60 * 60 * 1000) {
-    return certsCache.keys;
+  if (jwkCache && now - jwkCache.fetchedAt < 24 * 60 * 60 * 1000) {
+    return jwkCache.keys;
   }
-  const response = await fetch(CERT_URL);
-  if (!response.ok) throw new Error("Could not fetch Firebase public certs");
-  const keys = (await response.json()) as Record<string, string>;
-  certsCache = { keys, fetchedAt: now };
-  return keys;
+  const response = await fetch(JWK_URL);
+  if (!response.ok) throw new Error("Could not fetch Firebase public keys");
+  const data = (await response.json()) as { keys: Jwk[] };
+  jwkCache = { keys: data.keys, fetchedAt: now };
+  return data.keys;
 }
 
 export interface VerifiedToken {
@@ -35,7 +43,28 @@ export interface VerifiedToken {
   email?: string;
 }
 
-/** Verifies a Firebase ID token (RS256, Google public certs, project-bound).
+async function verifyRs256(
+  jwk: Jwk,
+  signedContent: Uint8Array,
+  signature: Uint8Array
+): Promise<boolean> {
+  const subtle = globalThis.crypto.subtle;
+  const key = await subtle.importKey(
+    "jwk",
+    { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: "RS256", use: "sig" },
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
+  return subtle.verify(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    signature as unknown as ArrayBuffer,
+    signedContent as unknown as ArrayBuffer
+  );
+}
+
+/** Verifies a Firebase ID token (RS256, Google public keys, project-bound).
  *  Returns the uid, or null when the token is invalid/expired/wrong project. */
 export async function verifyIdToken(token: string): Promise<VerifiedToken | null> {
   try {
@@ -44,22 +73,18 @@ export async function verifyIdToken(token: string): Promise<VerifiedToken | null
     const parts = token.split(".");
     if (parts.length !== 3) return null;
 
-    const header = JSON.parse(b64urlToBuffer(parts[0]).toString("utf8"));
+    const header = JSON.parse(new TextDecoder().decode(b64urlToBuffer(parts[0])));
     if (header.alg !== "RS256" || !header.kid) return null;
 
-    const certs = await getCerts();
-    const pem = certs[header.kid];
-    if (!pem) return null;
+    const keys = await getJwks();
+    const jwk = keys.find((k) => k.kid === header.kid);
+    if (!jwk) return null;
 
-    const signatureValid = crypto.verify(
-      "RSA-SHA256",
-      Buffer.from(`${parts[0]}.${parts[1]}`),
-      pem,
-      b64urlToBuffer(parts[2])
-    );
-    if (!signatureValid) return null;
+    const signed = b64urlToBuffer(`${parts[0]}.${parts[1]}`);
+    const signature = b64urlToBuffer(parts[2]);
+    if (!(await verifyRs256(jwk, signed, signature))) return null;
 
-    const claims = JSON.parse(b64urlToBuffer(parts[1]).toString("utf8"));
+    const claims = JSON.parse(new TextDecoder().decode(b64urlToBuffer(parts[1])));
 
     const nowSeconds = Math.floor(Date.now() / 1000);
     const issuerOk =
