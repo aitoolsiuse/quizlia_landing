@@ -5,3 +5,9 @@
 # secrets are still scanned.
 [build.environment]
   SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_FIREBASE_API_KEY,NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,NEXT_PUBLIC_FIREBASE_PROJECT_ID,NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,NEXT_PUBLIC_FIREBASE_APP_ID"
+  # Netlify's pattern-based "smart detection" false-positives on the
+  # Firebase web API key (AIza...), which is public by design and must be
+  # in the client bundle for Firebase web to work at all. The definite-
+  # secrets scan (env-var value matching for GEMINI_API_KEY, Stripe, etc.)
+  # remains fully active.
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
