@@ -8,6 +8,13 @@ export function CTASection() {
       <div aria-hidden="true" className="pointer-events-none absolute -left-[140px] top-[60px] h-[420px] w-[420px] rounded-full bg-white/[0.08] anim-drift" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-[80px] -top-[60px] h-[300px] w-[300px] rounded-full bg-white/[0.08] anim-drift [animation-direction:alternate-reverse]" />
       <div className="relative mx-auto flex w-full max-w-[1200px] flex-col items-center px-5 py-[110px] text-center md:px-10">
+        <Image
+          src="/mascot/quizliai_mascot_celebrate.webp"
+          alt=""
+          width={523}
+          height={640}
+          className="anim-float mb-6 h-auto w-[150px] md:w-[180px]"
+        />
         <h2 id="cta-h" className="reveal text-[clamp(48px,8vw,96px)] font-extrabold leading-[0.9] tracking-[-0.055em]">
           Ace the next one.
         </h2>

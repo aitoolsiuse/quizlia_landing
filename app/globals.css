@@ -330,6 +330,16 @@
   .anim-drift {
     animation: drift 14s ease-in-out infinite alternate;
   }
+  .anim-float {
+    animation: float 4.5s ease-in-out infinite;
+  }
+  .anim-wave {
+    transform-origin: 50% 90%;
+    animation: wave-tilt 2.8s ease-in-out infinite;
+  }
+  .anim-pop {
+    animation: mascot-pop 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) backwards;
+  }
   .anim-chip {
     animation: chip-pop 0.6s 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
   }
@@ -342,3 +352,7 @@
     }
   }
 }
+
+@keyframes float { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-10px) } }
+@keyframes wave-tilt { 0%,100% { transform: rotate(-2deg) } 50% { transform: rotate(3deg) } }
+@keyframes mascot-pop { from { transform: scale(0.3) translateY(20px); opacity: 0 } to { transform: none; opacity: 1 } }

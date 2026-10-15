@@ -1,9 +1,18 @@
 import Link from "next/link"
+import Image from "next/image"
 import { APP_STORE_URL } from "@/lib/constants"
 
 export function HeroSection() {
   return (
     <section aria-labelledby="hero-h" className="relative z-10">
+      <Image
+        src="/mascot/quizliai_mascot_wave.webp"
+        alt=""
+        width={449}
+        height={640}
+        priority
+        className="anim-wave pointer-events-none absolute bottom-[-40px] right-[3%] z-10 hidden h-auto w-[190px] xl:block 2xl:right-[8%] 2xl:w-[230px]"
+      />
       <div className="mx-auto flex w-full max-w-[1200px] flex-col items-center px-5 pt-[70px] text-center md:px-10">
         <h1
           id="hero-h"

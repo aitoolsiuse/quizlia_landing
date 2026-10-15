@@ -1,49 +1,56 @@
-"use client"
+"use client";
 
-import { useEffect, useRef, useState } from "react"
-import { demoSamples, type Sample } from "@/content/demoSamples"
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
+import { demoSamples, type Sample } from "@/content/demoSamples";
 
-type Phase = "idle" | "loading" | "result"
-type Tab = "notes" | "cards" | "quiz"
+type Phase = "idle" | "loading" | "result";
+type Tab = "notes" | "cards" | "quiz";
 
-const STEP_MS = 850
-const FINISH_MS = 300
+const STEP_MS = 850;
+const FINISH_MS = 300;
 const TABS: { id: Tab; label: string }[] = [
   { id: "notes", label: "Notes" },
   { id: "cards", label: "Flashcards" },
   { id: "quiz", label: "Quiz" },
-]
+];
 
 export function LiveDemo() {
-  const [selected, setSelected] = useState<Sample | null>(null)
-  const [phase, setPhase] = useState<Phase>("idle")
-  const [step, setStep] = useState(0)
-  const [tab, setTab] = useState<Tab>("notes")
-  const [runKey, setRunKey] = useState(0)
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
+  const [selected, setSelected] = useState<Sample | null>(null);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [step, setStep] = useState(0);
+  const [tab, setTab] = useState<Tab>("notes");
+  const [runKey, setRunKey] = useState(0);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
-    const pending = timers.current
-    return () => pending.forEach(clearTimeout)
-  }, [])
+    const pending = timers.current;
+    return () => pending.forEach(clearTimeout);
+  }, []);
 
   function run(sample: Sample) {
-    if (phase === "loading") return
-    timers.current.forEach(clearTimeout)
-    timers.current = []
-    setSelected(sample)
-    setPhase("loading")
-    setStep(1)
-    setTab("notes")
-    setRunKey((k) => k + 1)
-    timers.current.push(setTimeout(() => setStep(2), STEP_MS))
-    timers.current.push(setTimeout(() => setStep(3), STEP_MS * 2))
-    timers.current.push(setTimeout(() => setPhase("result"), STEP_MS * 3 + FINISH_MS))
+    if (phase === "loading") return;
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+    setSelected(sample);
+    setPhase("loading");
+    setStep(1);
+    setTab("notes");
+    setRunKey((k) => k + 1);
+    timers.current.push(setTimeout(() => setStep(2), STEP_MS));
+    timers.current.push(setTimeout(() => setStep(3), STEP_MS * 2));
+    timers.current.push(
+      setTimeout(() => setPhase("result"), STEP_MS * 3 + FINISH_MS),
+    );
   }
 
   const steps = selected
-    ? [`Reading the ${selected.kind}…`, "Writing your notes…", "Making flashcards & a quiz…"]
-    : []
+    ? [
+        `Reading the ${selected.kind}…`,
+        "Writing your notes…",
+        "Making flashcards & a quiz…",
+      ]
+    : [];
 
   return (
     <div className="relative z-10 mx-auto -mt-[110px] w-full max-w-[900px] rounded-[28px] bg-white p-4 shadow-[0_40px_80px_-40px_rgba(60,20,120,0.45),0_0_0_1px_rgba(22,18,31,0.06)] md:p-[26px]">
@@ -72,7 +79,7 @@ export function LiveDemo() {
       <div className="mt-3.5 flex flex-wrap items-center gap-2">
         <span className="text-[13px] font-semibold text-c-muted">Try one:</span>
         {demoSamples.map((s) => {
-          const on = selected?.id === s.id
+          const on = selected?.id === s.id;
           return (
             <button
               key={s.id}
@@ -88,27 +95,38 @@ export function LiveDemo() {
             >
               {s.label}
             </button>
-          )
+          );
         })}
       </div>
 
       <div className="mt-[22px] min-h-[330px] border-t border-[#eee8f5] pt-[22px]">
         {phase === "idle" && (
           <div className="flex min-h-[286px] flex-col items-center justify-center text-center">
-            <p className="text-[22px] font-bold text-c-ink">Pick a sample to start ↑</p>
-            <p className="mt-1 text-[15px] text-c-muted">Takes about 3 seconds in this demo.</p>
+            <p className="text-[22px] font-bold text-c-ink">
+              Pick a sample to start ↑
+            </p>
+            <p className="mt-1 text-[15px] text-c-muted">
+              Takes about 3 seconds in this demo.
+            </p>
           </div>
         )}
 
         {phase === "loading" && (
-          <div className="flex min-h-[286px] flex-col justify-center gap-4 pl-2">
+          <div className="relative flex min-h-[286px] flex-col justify-center gap-4 pl-2">
+            <Image
+              src="/mascot/quizliai_mascot_think.webp"
+              alt=""
+              width={328}
+              height={640}
+              className="anim-float pointer-events-none absolute bottom-0 right-0 h-auto w-[96px] sm:w-[120px]"
+            />
             <div role="status" aria-live="polite" className="sr-only">
               {steps[Math.min(step, 3) - 1]}
             </div>
             <ul className="space-y-4" aria-hidden="true">
               {steps.map((text, i) => {
-                const lit = i < step
-                const done = i < step - 1
+                const lit = i < step;
+                const done = i < step - 1;
                 return (
                   <li
                     key={text}
@@ -125,18 +143,23 @@ export function LiveDemo() {
                     )}
                     {text}
                   </li>
-                )
+                );
               })}
             </ul>
           </div>
         )}
 
         {phase === "result" && selected && (
-          <ResultView sample={selected} tab={tab} onTab={setTab} runKey={runKey} />
+          <ResultView
+            sample={selected}
+            tab={tab}
+            onTab={setTab}
+            runKey={runKey}
+          />
         )}
       </div>
     </div>
-  )
+  );
 }
 
 function ResultView({
@@ -145,29 +168,40 @@ function ResultView({
   onTab,
   runKey,
 }: {
-  sample: Sample
-  tab: Tab
-  onTab: (t: Tab) => void
-  runKey: number
+  sample: Sample;
+  tab: Tab;
+  onTab: (t: Tab) => void;
+  runKey: number;
 }) {
-  const refs = useRef<Record<Tab, HTMLButtonElement | null>>({ notes: null, cards: null, quiz: null })
+  const refs = useRef<Record<Tab, HTMLButtonElement | null>>({
+    notes: null,
+    cards: null,
+    quiz: null,
+  });
 
   function onKeyDown(e: React.KeyboardEvent, index: number) {
-    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return
-    e.preventDefault()
-    const next = TABS[(index + (e.key === "ArrowRight" ? 1 : -1) + TABS.length) % TABS.length].id
-    onTab(next)
-    refs.current[next]?.focus()
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    e.preventDefault();
+    const next =
+      TABS[
+        (index + (e.key === "ArrowRight" ? 1 : -1) + TABS.length) % TABS.length
+      ].id;
+    onTab(next);
+    refs.current[next]?.focus();
   }
 
   return (
     <div className="animate-[demo-in_0.35s_ease-out] motion-reduce:animate-none">
-      <div role="tablist" aria-label="Study set" className="inline-flex rounded-[14px] bg-c-soft p-[5px]">
+      <div
+        role="tablist"
+        aria-label="Study set"
+        className="inline-flex rounded-[14px] bg-c-soft p-[5px]"
+      >
         {TABS.map((t, i) => (
           <button
             key={t.id}
             ref={(el) => {
-              refs.current[t.id] = el
+              refs.current[t.id] = el;
             }}
             role="tab"
             id={`demo-tab-${t.id}`}
@@ -178,7 +212,9 @@ function ResultView({
             onClick={() => onTab(t.id)}
             onKeyDown={(e) => onKeyDown(e, i)}
             className={`min-h-11 rounded-[10px] px-4 text-[14px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-c-brand ${
-              tab === t.id ? "bg-white text-c-ink shadow-[0_2px_6px_rgba(60,20,120,0.1)]" : "text-c-muted"
+              tab === t.id
+                ? "bg-white text-c-ink shadow-[0_2px_6px_rgba(60,20,120,0.1)]"
+                : "text-c-muted"
             }`}
           >
             {t.label}
@@ -194,11 +230,15 @@ function ResultView({
         className="mt-5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-c-brand"
       >
         {tab === "notes" && <NotesPane sample={sample} />}
-        {tab === "cards" && <FlashcardsPane key={`${sample.id}-${runKey}`} sample={sample} />}
-        {tab === "quiz" && <QuizPane key={`${sample.id}-${runKey}`} sample={sample} />}
+        {tab === "cards" && (
+          <FlashcardsPane key={`${sample.id}-${runKey}`} sample={sample} />
+        )}
+        {tab === "quiz" && (
+          <QuizPane key={`${sample.id}-${runKey}`} sample={sample} />
+        )}
       </div>
     </div>
-  )
+  );
 }
 
 function NotesPane({ sample }: { sample: Sample }) {
@@ -216,17 +256,17 @@ function NotesPane({ sample }: { sample: Sample }) {
         ))}
       </ul>
     </div>
-  )
+  );
 }
 
 function FlashcardsPane({ sample }: { sample: Sample }) {
-  const [i, setI] = useState(0)
-  const [flipped, setFlipped] = useState(false)
-  const [q, a] = sample.cards[i]
+  const [i, setI] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [q, a] = sample.cards[i];
   const go = (d: number) => {
-    setFlipped(false)
-    setI((n) => (n + d + sample.cards.length) % sample.cards.length)
-  }
+    setFlipped(false);
+    setI((n) => (n + d + sample.cards.length) % sample.cards.length);
+  };
   return (
     <div className="flex flex-col items-center">
       <button
@@ -261,7 +301,10 @@ function FlashcardsPane({ sample }: { sample: Sample }) {
         >
           ←
         </button>
-        <span className="text-[14px] font-semibold text-c-muted" aria-live="polite">
+        <span
+          className="text-[14px] font-semibold text-c-muted"
+          aria-live="polite"
+        >
           {i + 1} / {sample.cards.length} · tap to flip
         </span>
         <button
@@ -274,20 +317,20 @@ function FlashcardsPane({ sample }: { sample: Sample }) {
         </button>
       </div>
     </div>
-  )
+  );
 }
 
 function QuizPane({ sample }: { sample: Sample }) {
-  const [picked, setPicked] = useState<number | null>(null)
-  const { q, options, answer } = sample.quiz
-  const locked = picked !== null
+  const [picked, setPicked] = useState<number | null>(null);
+  const { q, options, answer } = sample.quiz;
+  const locked = picked !== null;
   return (
     <div>
       <h3 className="text-[22px] font-bold text-c-ink">{q}</h3>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {options.map((opt, j) => {
-          const right = locked && j === answer
-          const wrong = locked && j === picked && j !== answer
+          const right = locked && j === answer;
+          const wrong = locked && j === picked && j !== answer;
           return (
             <button
               key={opt}
@@ -305,17 +348,30 @@ function QuizPane({ sample }: { sample: Sample }) {
             >
               {opt}
               {right && <span className="sr-only"> (correct answer)</span>}
-              {wrong && <span className="sr-only"> (your answer, incorrect)</span>}
+              {wrong && (
+                <span className="sr-only"> (your answer, incorrect)</span>
+              )}
             </button>
-          )
+          );
         })}
       </div>
-      <p className="mt-4 min-h-6 text-[15px] font-semibold text-c-ink" aria-live="polite">
-        {locked &&
-          (picked === answer
-            ? "Nailed it. Imagine this on your own lecture notes."
-            : "Not quite. That's why we quiz you before the test.")}
-      </p>
+      <div className="mt-4 flex min-h-[72px] items-center gap-3">
+        {locked && picked === answer && (
+          <Image
+            src="/mascot/quizliai_mascot_thumbs_up.webp"
+            alt=""
+            width={420}
+            height={640}
+            className="anim-pop h-auto w-[56px] shrink-0"
+          />
+        )}
+        <p className="text-[15px] font-semibold text-c-ink" aria-live="polite">
+          {locked &&
+            (picked === answer
+              ? "Nailed it. Imagine this on your own lecture notes."
+              : "Not quite. That's why we quiz you before the test.")}
+        </p>
+      </div>
     </div>
-  )
+  );
 }
