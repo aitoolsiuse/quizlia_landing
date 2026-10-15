@@ -284,3 +284,61 @@
     display: flex;
   }
 }
+
+@keyframes demo-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Landing page motion: simple, opt-in only for users without reduced-motion. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes drift {
+  to {
+    transform: translate(24px, -18px);
+  }
+}
+@keyframes chip-pop {
+  from {
+    opacity: 0;
+    transform: rotate(0deg) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-3deg) scale(1);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .anim-rise {
+    animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    animation-delay: var(--d, 0s);
+  }
+  .anim-drift {
+    animation: drift 14s ease-in-out infinite alternate;
+  }
+  .anim-chip {
+    animation: chip-pop 0.6s 0.45s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
+  }
+  /* Scroll reveal without JS. Browsers without scroll-driven animations just show the content. */
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: rise linear backwards;
+      animation-timeline: view();
+      animation-range: entry 0% entry 35%;
+    }
+  }
+}
